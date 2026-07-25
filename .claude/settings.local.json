@@ -28,7 +28,14 @@
       "Bash(powershell -Command 'Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '\\\\''127.*'\\\\'' -and $_.IPAddress -notlike '\\\\''169.*'\\\\'' } | Select-Object IPAddress, InterfaceAlias | Format-Table -AutoSize')",
       "Bash(powershell -Command \"Get-NetFirewallRule -DisplayName 'Streamlit*' -ErrorAction SilentlyContinue | Select-Object DisplayName, Enabled, Direction, Action | Format-Table -AutoSize\")",
       "Bash(git rm *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git check-ignore *)",
+      "Bash(grep -iE \"secret|\\\\.env|FlightHunter|\\\\.db$|historial|analisis\")",
+      "Bash(git remote *)",
+      "Bash(git ls-remote *)",
+      "Bash(git ls-tree *)",
+      "Bash(powershell -Command \"\\(Get-TimeZone\\).Id; \\(Get-TimeZone\\).DisplayName\")",
+      "Bash(python -)"
     ]
   }
 }

@@ -33,10 +33,13 @@ class MLBDataFetcher:
         except Exception:
             return self._get_fallback_games()
 
-    def get_live_scores(self) -> list:
-        """Marcadores en vivo / finales de la jornada vía MLB Stats API (hydrate=linescore)."""
+    def get_live_scores(self, date: str = None) -> list:
+        """Marcadores en vivo / finales vía MLB Stats API (hydrate=linescore).
+        Si se pasa `date` (YYYY-MM-DD) devuelve los partidos de ESE día; si no, los de hoy.
+        Necesario para cerrar picks de jornadas anteriores."""
         try:
-            url = f"{self.BASE_URL}/schedule?sportId=1&hydrate=linescore,team,probablePitcher"
+            fecha = f"&date={date}" if date else ""
+            url = f"{self.BASE_URL}/schedule?sportId=1{fecha}&hydrate=linescore,team,probablePitcher"
             response = requests.get(url, timeout=6).json()
             dates = response.get('dates', [])
             if not dates:

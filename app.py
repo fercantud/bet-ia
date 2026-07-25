@@ -3,6 +3,21 @@ import os
 import sqlite3
 from datetime import datetime, timedelta
 
+# Zona horaria fija: sin esto, la app usa el reloj del servidor. En Streamlit Cloud
+# ese reloj es UTC, asi que a las 18:00 de Mexico ya seria "manana" y la nube
+# generaria una jornada distinta a la de tu PC. Con esto ambas ven el mismo dia.
+APP_TZ = "America/Chicago"   # Hora Central (misma que tu equipo)
+try:
+    from zoneinfo import ZoneInfo
+    _TZ = ZoneInfo(APP_TZ)
+except Exception:
+    _TZ = None
+
+
+def now_local():
+    """Fecha y hora en la zona horaria de la app (no la del servidor)."""
+    return datetime.now(_TZ) if _TZ else datetime.now()
+
 import pandas as pd
 import streamlit as st
 
@@ -553,7 +568,7 @@ def team_logo_sq(team_id):
 # Solo se recalcula cuando cambia la fecha (nueva jornada).
 # ---------------------------------------------------------------------------
 def get_todays_analysis():
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = now_local().strftime("%Y-%m-%d")
     if os.path.exists(ANALYSIS_CACHE):
         try:
             with open(ANALYSIS_CACHE, encoding="utf-8") as f:
@@ -635,7 +650,7 @@ def sync_today_picks():
     si hoy ya se registraron no se duplican, y las jornadas anteriores se conservan
     (nunca se borran). Los picks NO BET (stake 0%) se guardan con beneficio 0."""
     bets = _read_history_file()
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = now_local().strftime("%Y-%m-%d")
     existing_today = {(b["matchup"], b["selection"]) for b in bets
                       if str(b.get("date", "")).startswith(today)}
     next_id = max([int(b.get("id", 0)) for b in bets], default=0) + 1
@@ -746,14 +761,37 @@ def settle_pick(matchup, selection, market, games):
     return "WON" if _team_match(selection, winner) else "LOST"
 
 
+@st.cache_data(ttl=900)
+def scores_for_date(dia):
+    """Resultados de una fecha concreta (para cerrar picks de dias anteriores)."""
+    return MLBDataFetcher().get_live_scores(date=dia)
+
+
 def auto_settle_db(games):
-    """Cierra automáticamente los picks pendientes cuyo partido ya finalizó."""
+    """Cierra automaticamente los picks pendientes cuyo partido ya finalizo.
+    Consulta los resultados de LA FECHA de cada pick: los de jornadas anteriores
+    ya no aparecen en la agenda de hoy, por eso se piden por separado."""
     bets = _read_history_file()
+    hoy = now_local().strftime("%Y-%m-%d")
     changed = False
+    por_fecha = {}   # cache local: fecha -> partidos de ese dia
+
     for b in bets:
         if b.get("result") != "PENDING":
             continue
-        r = settle_pick(b["matchup"], b["selection"], b.get("market"), games)
+        dia = str(b.get("date", ""))[:10]
+        if dia == hoy:
+            partidos = games                       # jornada actual, ya la tenemos
+        else:
+            if dia not in por_fecha:
+                try:
+                    por_fecha[dia] = scores_for_date(dia)
+                except Exception:
+                    por_fecha[dia] = []
+            partidos = por_fecha[dia]
+        if not partidos:
+            continue
+        r = settle_pick(b["matchup"], b["selection"], b.get("market"), partidos)
         if r in ("WON", "LOST", "PUSH"):
             frac = parse_stake_fraction(b.get("kelly_stake"))
             odds = float(b.get("odds", 0) or 0)
@@ -974,7 +1012,7 @@ with st.sidebar:
             st.rerun()
 
     live_now = [x for x in fetch_live_scores() if x["is_live"]]
-    now = datetime.now().strftime("%H:%M:%S")
+    now = now_local().strftime("%H:%M:%S")
     st.markdown(
         f'<div style="margin-top:16px;padding-top:14px;border-top:1px solid rgb(var(--dkline));">'
         f'<p style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;'
@@ -1029,7 +1067,7 @@ def render_jornada():
     b.markdown(
         f'<p style="color:rgb(var(--ink2));font-size:13px;margin-top:9px;">'
         f'🔴 {len(en_vivo)} en vivo · 🔵 {len(prox)} por comenzar · ✅ {len(fin)} finalizados '
-        f'· {datetime.now().strftime("%d/%m/%Y")}</p>',
+        f'· {now_local().strftime("%d/%m/%Y")}</p>',
         unsafe_allow_html=True)
 
     md_rows = render_matchday_table(live)
@@ -1221,7 +1259,7 @@ def render_en_vivo():
     else:
         games = live_now + prev + finals  # orden: en vivo, próximos, finalizados
 
-    fecha = datetime.now().strftime("%d/%m")
+    fecha = now_local().strftime("%d/%m")
     body = (
         f'<div class="fh-card"><div class="fh-card-body" style="padding-top:14px;">'
         f'<div class="fh-league"><span style="color:rgb(var(--warn));">★</span> 🇺🇸 ESTADOS UNIDOS: MLB '
@@ -1234,7 +1272,7 @@ def render_en_vivo():
         body += '<p style="color:rgb(var(--ink2));margin:12px 6px;">Sin partidos en esta pestaña.</p>'
     body += '</div></div>'
     st.markdown(body, unsafe_allow_html=True)
-    st.caption(f"Datos en caché 60s · última lectura {datetime.now().strftime('%H:%M:%S')}")
+    st.caption(f"Datos en caché 60s · última lectura {now_local().strftime('%H:%M:%S')}")
 
 
 # ---------------------------------------------------------------------------
@@ -1361,7 +1399,7 @@ def render_resultados():
 
     # ---- Filtro de periodo (Hoy · Ayer · Semana · Mes · Calendario) ----
     det["_dia"] = pd.to_datetime(en["date"].astype(str).str[:10], errors="coerce").dt.date
-    hoy = datetime.now().date()
+    hoy = now_local().date()
     fc = st.columns([5, 3])
     with fc[0]:
         periodo = st.radio("periodo", ["Todo", "Hoy", "Ayer", "Esta semana", "Este mes", "Calendario"],
