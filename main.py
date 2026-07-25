@@ -139,21 +139,26 @@ def _build_bets_from_real_games():
             # Probabilidades por mercado con la fórmula SIN CAMBIOS. Las cuotas planas
             # aquí solo sirven para obtener las probabilidades; el edge se recalcula abajo
             # con cuotas reales (si hay API key) o estimadas de forma realista.
+            # Linea REAL de totales de la casa para este partido (7.5, 9.0, 10.5...).
+            # Si no hay cuotas reales se usa 8.5 como antes.
+            od_pre = real_odds.get(f"{away} @ {home}", {})
+            linea_total = float(od_pre.get("total_line") or 8.5)
+
             _b, markets, _scores = RankingEngine.evaluate_all_markets(
                 {"home_team": home, "away_team": away}, model_home,
                 {"ml_odds": 1.90, "over_odds": 1.90, "under_odds": 1.90, "f5_odds": 1.90},
-                exp_home, exp_away,
+                exp_home, exp_away, total_line=linea_total,
             )
 
             # Se evalúan LOS TRES mercados (ML, Totales, F5). Cuotas REALES para ML y
             # Totales (The Odds API); F5 estimado (la API gratis no lo ofrece). El modelo
             # elige el mercado con mayor edge (misma fórmula de RankingEngine, sin cambios).
-            od = real_odds.get(f"{away} @ {home}", {})
+            od = od_pre
             fav_home = model_home >= 0.5
             gid = str(g.get("game_id", "0"))
             real_ml = od.get("home_odds") if fav_home else od.get("away_odds")
             real_over, real_under = od.get("over_odds"), od.get("under_odds")
-            under_side = (exp_home + exp_away) < 8.5
+            under_side = (exp_home + exp_away) < linea_total
 
             for m in markets:
                 p = float(m["prob"])

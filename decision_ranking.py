@@ -18,7 +18,10 @@ class RankingEngine:
         return score_matrix[:3]
 
     @staticmethod
-    def evaluate_all_markets(game, p_home_model, odds_dict, exp_home, exp_away):
+    def evaluate_all_markets(game, p_home_model, odds_dict, exp_home, exp_away, total_line=8.5):
+        # total_line: linea REAL de la casa (7.5, 9.0, 10.5...). Antes se asumia
+        # siempre 8.5, lo que evaluaba mal casi todos los totales. La formula es
+        # la misma; solo se corrige el dato de entrada.
         ml_odds = odds_dict.get('ml_odds', 1.85)
         over_odds = odds_dict.get('over_odds', 1.90)
         under_odds = odds_dict.get('under_odds', 1.90)
@@ -31,7 +34,7 @@ class RankingEngine:
 
         p_ml = p_home_model
         total_exp = exp_home + exp_away
-        p_under = round(0.50 + (8.5 - total_exp) * 0.03, 3)
+        p_under = round(0.50 + (total_line - total_exp) * 0.03, 3)
         p_under = min(0.68, max(0.42, p_under))
         p_f5 = round(p_ml + 0.01, 3)
 
@@ -45,10 +48,10 @@ class RankingEngine:
             },
             {
                 "market": "Total",
-                "selection": "Under 8.5" if total_exp < 8.5 else "Over 8.5",
-                "prob": round(p_under if total_exp < 8.5 else (1.0 - p_under + 0.1), 4),
-                "odds": under_odds if total_exp < 8.5 else over_odds,
-                "edge": round((p_under if total_exp < 8.5 else (1.0 - p_under + 0.1)) - (implied_under if total_exp < 8.5 else implied_over), 4)
+                "selection": (f"Under {total_line:g}" if total_exp < total_line else f"Over {total_line:g}"),
+                "prob": round(p_under if total_exp < total_line else (1.0 - p_under + 0.1), 4),
+                "odds": under_odds if total_exp < total_line else over_odds,
+                "edge": round((p_under if total_exp < total_line else (1.0 - p_under + 0.1)) - (implied_under if total_exp < total_line else implied_over), 4)
             },
             {
                 "market": "F5",
