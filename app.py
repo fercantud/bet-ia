@@ -577,6 +577,15 @@ def get_todays_analysis():
                 return cached["bets"]  # mismos picks del día, estables
         except Exception:
             pass
+    # Semilla fija por fecha: el motor usa simulacion Monte Carlo (aleatoria), asi que
+    # dos equipos distintos daban picks distintos el mismo dia. Con esto, el mismo dia
+    # produce SIEMPRE el mismo resultado. No cambia ninguna formula: solo hace que el
+    # sorteo aleatorio sea reproducible.
+    try:
+        import numpy as _np
+        _np.random.seed(int(today.replace("-", "")))
+    except Exception:
+        pass
     bets = get_analyzed_bets()  # se corre una única vez por día
     try:
         with open(ANALYSIS_CACHE, "w", encoding="utf-8") as f:

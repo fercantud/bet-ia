@@ -35,7 +35,10 @@
       "Bash(git ls-remote *)",
       "Bash(git ls-tree *)",
       "Bash(powershell -Command \"\\(Get-TimeZone\\).Id; \\(Get-TimeZone\\).DisplayName\")",
-      "Bash(python -)"
+      "Bash(python -)",
+      "Bash(git commit -q -m 'Sincronizar nube con local: mismos picks e historial *)",
+      "Bash(git push *)",
+      "Bash(git commit -q -m 'Semilla fija por fecha: analisis reproducible entre instancias *)"
     ]
   }
 }
