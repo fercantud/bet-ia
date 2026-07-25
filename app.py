@@ -1162,10 +1162,10 @@ def render_dashboard():
             unsafe_allow_html=True,
         )
 
-    # ---- Tabla unificada de la jornada ----
-    render_matchday_table(live)
+    # La tabla de la jornada vive ahora en su propia pestaña "Jornada de hoy",
+    # asi que aqui no se repite.
 
-    # ---- Marcadores en vivo (debajo de la tabla) ----
+    # ---- Marcadores en vivo ----
     rb = badge(f"{len(live_now)} en vivo", "live") if live_now else badge("sin partidos en vivo", "neutral")
     body = card_header("Marcadores en vivo", "Partidos en curso ahora mismo", "radio", rb)
     if live_now:
