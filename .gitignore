@@ -1,0 +1,22 @@
+# Entorno virtual
+venv/
+__pycache__/
+*.pyc
+
+# Secretos (NUNCA subir)
+.streamlit/secrets.toml
+.env
+
+# Otro proyecto que vive dentro de esta carpeta (no pertenece a BET IA)
+FlightHunter/
+
+# Configuracion local del editor
+.claude/
+
+# Datos locales / generados
+bet_ia_performance.db
+historial_apuestas*.json
+analisis_hoy.json
+bet_ia_audit_tracker.csv
+*.log
+.pytest_cache/

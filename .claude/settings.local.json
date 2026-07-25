@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -c \"Get-ChildItem\")",
+      "Bash(venv/Scripts/python.exe main.py)",
+      "Bash(python main.py)",
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('app.py',encoding='utf-8'\\).read\\(\\)\\)\")",
+      "Bash(powershell -Command 'Get-Process -Name python -ErrorAction SilentlyContinue | Where-Object {$_.Path -like '\\\\''*bet_ia*'\\\\''} | Stop-Process -Force')",
+      "Bash(netstat -ano)",
+      "Bash(powershell -Command \"Get-ChildItem -Path C:\\\\Users\\\\FernandoCantu -Recurse -Include *.py,*.html -ErrorAction SilentlyContinue | Select-String -Pattern 'flight' -List | Select-Object Path -Unique\")",
+      "Bash(powershell -Command \"Get-Process -Name streamlit -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(powershell -Command \"Get-CimInstance Win32_Process -Filter \\\\\"CommandLine LIKE '%streamlit%'\\\\\" | Select-Object ProcessId,CommandLine\")",
+      "Bash(powershell -Command \"Stop-Process -Id 36172,25628 -Force -ErrorAction SilentlyContinue\")",
+      "Bash(powershell -Command \"Get-CimInstance Win32_Process -Filter \\\\\"CommandLine LIKE '%streamlit%app.py%'\\\\\" | Select-Object ProcessId,CommandLine\")",
+      "Bash(venv/Scripts/python.exe -c ' *)",
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('app.py',encoding='utf-8'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"from mlb_api import MLBDataFetcher; g=MLBDataFetcher\\(\\).get_live_scores\\(\\); print\\('live scores rows:', len\\(g\\)\\); print\\(g[0]['away_team'], g[0]['away_score'],'-',g[0]['home_score'], g[0]['home_team'], '|', g[0]['detail']\\)\")",
+      "Bash(powershell -Command 'Get-CimInstance Win32_Process -Filter \"CommandLine LIKE '\\\\''%streamlit run app.py%'\\\\''\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }')",
+      "Bash(venv/Scripts/python.exe -c \"from mlb_api import MLBDataFetcher; g=MLBDataFetcher\\(\\).get_live_scores\\(\\); [print\\(x['away_team'],x['away_score'],'-',x['home_score'],x['home_team'],'| inning',x['inning'],x['inning_state'],'|',x['detail']\\) for x in g]\")",
+      "Bash(venv/Scripts/python.exe -c \"import pandas as pd; print\\('pandas', pd.__version__\\)\")",
+      "Bash(venv/Scripts/python.exe -)",
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('main.py',encoding='utf-8'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
+      "Bash(PYTHONIOENCODING=utf-8 venv/Scripts/python.exe -c ' *)",
+      "Bash(powershell -Command 'Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '\\\\''127.*'\\\\'' -and $_.IPAddress -notlike '\\\\''169.*'\\\\'' } | Select-Object IPAddress, InterfaceAlias')",
+      "Bash(rm -f run.log)",
+      "Bash(grep -E \"secrets|db$|json\" .gitignore)",
+      "Bash(cp historial_apuestas.json historial_apuestas.backup.json)",
+      "Bash(powershell -Command 'Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '\\\\''127.*'\\\\'' -and $_.IPAddress -notlike '\\\\''169.*'\\\\'' } | Select-Object IPAddress, InterfaceAlias | Format-Table -AutoSize')",
+      "Bash(powershell -Command \"Get-NetFirewallRule -DisplayName 'Streamlit*' -ErrorAction SilentlyContinue | Select-Object DisplayName, Enabled, Direction, Action | Format-Table -AutoSize\")",
+      "Bash(git rm *)",
+      "Bash(git add *)"
+    ]
+  }
+}
