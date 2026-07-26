@@ -937,22 +937,34 @@ def pick_label(bet):
     return sel  # TOTAL ('Over 8.5') y F5 ('... F5') ya vienen descriptivos
 
 
-def build_parlay(bets, games, n=3):
-    """Arma el parlay MAS SEGURO del dia: las n selecciones con mayor probabilidad
-    del modelo entre los picks aprobados (+EV). Se prioriza la probabilidad, no la
-    cuota. Devuelve las patas, la probabilidad y cuota combinadas y el estado."""
-    aprobados = [b for b in bets if b.get("approved")]
-    patas = sorted(aprobados, key=lambda b: -float(b["prob_model"]))[:n]
-    if not patas:
+def build_parlay(bets, games, min_prob=0.50, max_legs=6):
+    """BET IA decide cuantas patas lleva el parlay.
+    Agrega selecciones (de mayor a menor probabilidad, solo picks aprobados)
+    mientras la probabilidad COMBINADA siga por encima del umbral (50% por
+    defecto). Si ni siquiera con 2 patas se supera ese umbral, no hay parlay:
+    lo correcto es no apostar."""
+    aprobados = sorted([b for b in bets if b.get("approved")],
+                       key=lambda b: -float(b["prob_model"]))
+    if len(aprobados) < 2:
         return None
 
-    prob = 1.0
+    patas, prob = [], 1.0
+    for b in aprobados[:max_legs]:
+        p_next = prob * float(b["prob_model"])
+        if len(patas) >= 2 and p_next < min_prob:
+            break                      # agregar esta pata bajaria del umbral
+        patas.append(b)
+        prob = p_next
+
+    if len(patas) < 2 or prob < min_prob:
+        return None                    # NO APOSTAR: ninguna combinacion es segura
+
     cuota = 1.0
+    prob_mercado = 1.0
     for b in patas:
-        prob *= float(b["prob_model"])
         cuota *= float(b["odds"])
-        b_res = settle_pick(b["matchup"], b["selection"], b["market"], games)
-        b["_res"] = b_res
+        prob_mercado *= 1.0 / float(b["odds"])   # lo que implica la cuota
+        b["_res"] = settle_pick(b["matchup"], b["selection"], b["market"], games)
 
     if any(b["_res"] == "LOST" for b in patas):
         estado = "LOST"
@@ -963,7 +975,8 @@ def build_parlay(bets, games, n=3):
 
     return {
         "patas": patas,
-        "prob": prob,
+        "prob": prob,                      # segun el MODELO
+        "prob_mercado": prob_mercado,      # segun las CUOTAS de las casas
         "cuota": round(cuota, 2),
         "ev": prob * cuota - 1.0,
         "estado": estado,
@@ -974,9 +987,11 @@ def build_parlay(bets, games, n=3):
 def parlay_card_html(p, games):
     """Tarjeta del parlay con checklist por pata."""
     if not p:
-        return ('<div class="fh-card"><div class="fh-card-body">'
-                '<p style="color:rgb(var(--ink2));margin:0;">Hoy no hay picks aprobados '
-                'para armar un parlay.</p></div></div>')
+        return (card_header("El Parlay de Hoy", "Sin combinación segura", "trophy",
+                            badge("🚫 NO APOSTAR", "fare"))
+                + '<p style="color:rgb(var(--ink2));margin:0;font-size:13px;">'
+                'Ninguna combinación de 2 o más picks supera el 50% de probabilidad. '
+                'Lo correcto hoy es no armar parlay.</p></div></div>')
 
     est = {
         "WON": (badge("✅ GANADO", "save"), "won"),
@@ -1000,12 +1015,14 @@ def parlay_card_html(p, games):
         )
 
     return (
-        card_header("El Parlay de Hoy", f'{len(p["patas"])} selecciones más seguras',
+        card_header("El Parlay de Hoy",
+                    f'{len(p["patas"])} patas · elegidas por BET IA para superar el 50%',
                     "trophy", est[0])
         + f'<div class="pl-legs {est[1]}">{filas}</div>'
         + f'<div class="pl-foot">'
-        f'<div><span>Probabilidad</span><b>{p["prob"]:.1%}</b></div>'
-        f'<div><span>Cuota total</span><b>{p["cuota"]:.2f}</b></div>'
+        f'<div><span>Prob. modelo</span><b class="pos">{p["prob"]:.1%}</b></div>'
+        f'<div><span>Prob. mercado</span><b>{p["prob_mercado"]:.1%}</b></div>'
+        f'<div><span>Cuota</span><b>{p["cuota"]:.2f}</b></div>'
         f'<div><span>EV</span><b class="{"pos" if p["ev"] > 0 else "neg"}">{p["ev"]:+.1%}</b></div>'
         f'</div></div></div>'
     )
