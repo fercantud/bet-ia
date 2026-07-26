@@ -314,32 +314,6 @@ svg{ display:inline-block; vertical-align:middle; }
 .fh-hrow{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 0;
     border-bottom:1px solid rgb(var(--line)); font-size:13px; }
 
-/* match list (estilo FlashScore) */
-.fh-league{ display:flex; align-items:center; gap:8px; padding:11px 14px; background:rgb(var(--surface2));
-    border:1px solid rgb(var(--line)); border-radius:10px; margin-bottom:6px;
-    font-size:13px; font-weight:700; color:rgb(var(--ink)); }
-.fh-league .cls{ margin-left:auto; font-size:12px; font-weight:500; color:rgb(var(--accent)); }
-.fh-match{ border-bottom:1px solid rgb(var(--line)); }
-.fh-match:hover{ background:rgb(var(--surface2)/0.5); }
-.fh-mrow{ display:grid; grid-template-columns:92px 1fr auto auto; align-items:center; gap:14px; padding:11px 6px 4px 6px; }
-.fh-mstatus{ font-size:12px; font-weight:700; line-height:1.25; }
-.fh-mstatus .star{ color:rgb(var(--warn)); font-size:13px; }
-.fh-mstatus.live{ color:rgb(var(--fare)); }
-.fh-mstatus.final{ color:rgb(var(--ink2)); font-weight:600; }
-.fh-mstatus.prev{ color:rgb(var(--ink)); font-variant-numeric:tabular-nums; }
-.fh-mteams{ display:flex; flex-direction:column; gap:7px; min-width:0; }
-.fh-mteam{ display:flex; align-items:center; gap:9px; font-size:14px; color:rgb(var(--ink2)); }
-.fh-mteam.win{ color:rgb(var(--ink)); font-weight:700; }
-.fh-mteam img{ width:20px; height:20px; object-fit:contain; flex-shrink:0; }
-.fh-mteam .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.fh-mscore{ display:flex; flex-direction:column; gap:7px; align-items:flex-end; font-variant-numeric:tabular-nums;
-    font-size:15px; font-weight:800; }
-.fh-mscore .muted{ color:rgb(var(--ink2)); font-weight:600; }
-.fh-mscore .b{ display:flex; align-items:center; gap:6px; }
-.fh-bat{ width:7px; height:7px; border-radius:999px; background:rgb(var(--warn)); display:inline-block; }
-.fh-mchip{ display:flex; justify-content:flex-end; }
-.fh-mpitch{ font-size:11.5px; color:rgb(var(--accent)); padding:0 6px 11px 106px; line-height:1.4; }
-
 /* filter pills (radio) */
 div[role="radiogroup"]{ flex-direction:row; flex-wrap:wrap; gap:8px; }
 div[role="radiogroup"] > label{ background:rgb(var(--surface2)); border:1px solid rgb(var(--line));
@@ -537,60 +511,6 @@ def scoreboard_html(g):
         f'</div><div class="fh-score-side">'
         f'<span class="fh-score-st {st_cls}">{st_txt}</span>{diamond}</div></div>'
     )
-
-
-def match_row_html(g):
-    """Fila estilo FlashScore: estado · equipos+logos · marcador · chip · lanzadores."""
-    if g["is_live"]:
-        if g["inning"] and g["inning"] > 9:
-            status_txt = "Entrada Extra"
-        else:
-            status_txt = f'{g["inning"]}ª Entrada' if g["inning"] else "En vivo"
-        status_cls = "live"
-        chip = badge("EN VIVO", "live")
-    elif g["is_final"]:
-        status_txt = "Finalizado"
-        status_cls = "final"
-        chip = badge("FINAL", "neutral")
-    else:
-        status_txt = fmt_start(g["start_utc"])
-        status_cls = "prev"
-        chip = badge("PRÓX", "accent")
-
-    scored = g["is_live"] or g["is_final"]
-    a_win = "win" if scored and g["away_score"] > g["home_score"] else ""
-    h_win = "win" if scored and g["home_score"] > g["away_score"] else ""
-
-    bat_away = g["is_live"] and str(g["inning_state"]).startswith("Top")
-    bat_home = g["is_live"] and str(g["inning_state"]).startswith("Bottom")
-    dot_a = '<span class="fh-bat"></span>' if bat_away else ""
-    dot_h = '<span class="fh-bat"></span>' if bat_home else ""
-
-    a_sc = str(g["away_score"]) if scored else "-"
-    h_sc = str(g["home_score"]) if scored else "-"
-    sc_cls = "" if scored else "muted"
-
-    pitch = ""
-    pit = [p for p in [g["away_pitcher"], g["home_pitcher"]] if p]
-    if pit:
-        pitch = f'<div class="fh-mpitch">Lanzadores: {" · ".join(pit)}</div>'
-
-    return (
-        f'<div class="fh-match"><div class="fh-mrow">'
-        f'<div class="fh-mstatus {status_cls}"><span class="star">★</span> {status_txt}</div>'
-        f'<div class="fh-mteams">'
-        f'<div class="fh-mteam {a_win}">{team_logo_sq(g["away_id"])}<span class="nm">{g["away_team"]}</span></div>'
-        f'<div class="fh-mteam {h_win}">{team_logo_sq(g["home_id"])}<span class="nm">{g["home_team"]}</span></div>'
-        f'</div>'
-        f'<div class="fh-mscore"><span class="b">{dot_a}<span class="{sc_cls}">{a_sc}</span></span>'
-        f'<span class="b">{dot_h}<span class="{sc_cls}">{h_sc}</span></span></div>'
-        f'<div class="fh-mchip">{chip}</div>'
-        f'</div>{pitch}</div>'
-    )
-
-
-def team_logo_sq(team_id):
-    return f'<img src="https://www.mlbstatic.com/team-logos/{team_id}.svg" alt=""/>'
 
 
 # ---------------------------------------------------------------------------
@@ -1291,17 +1211,7 @@ def render_dashboard():
     # La tabla de la jornada vive ahora en su propia pestaña "Jornada de hoy",
     # asi que aqui no se repite.
 
-    # ---- Marcadores en vivo ----
-    rb = badge(f"{len(live_now)} en vivo", "live") if live_now else badge("sin partidos en vivo", "neutral")
-    body = card_header("Marcadores en vivo", "Partidos en curso ahora mismo", "radio", rb)
-    if live_now:
-        body += f'<div class="fh-grid">{"".join(scoreboard_html(g) for g in live_now)}</div>'
-    else:
-        finals = [g for g in live if g["is_final"]]
-        body += (f'<p style="color:rgb(var(--ink2));font-size:13.5px;margin:0;">No hay partidos en vivo ahora · '
-                 f'{len(finals)} finalizados · {len(prev)} por comenzar. Abre <b style="color:rgb(var(--ink));">En Vivo</b> para el detalle.</p>')
-    body += '</div></div>'
-    st.markdown(body, unsafe_allow_html=True)
+    # Los marcadores en vivo viven ahora en la pestaña "En Vivo".
 
     bcol1, bcol2 = st.columns(2, gap="large")
     if bcol1.button("Ver todos los picks aprobados", key="see_picks", type="secondary", use_container_width=True):
@@ -1367,50 +1277,43 @@ def render_predicciones():
 # PÁGINA: En Vivo
 # ---------------------------------------------------------------------------
 def render_en_vivo():
-    topbar("En Vivo", "Centro de partidos en tiempo real · MLB Stats API", "sensors")
+    """Marcadores en vivo (movidos aqui desde el Dashboard)."""
+    topbar("En Vivo", "Marcadores en tiempo real · MLB Stats API", "sensors")
 
-    fc = st.columns([5, 1])
-    with fc[0]:
-        tab = st.radio("filtro", ["Todos", "En Directo", "Finalizados", "Próximos"],
-                       horizontal=True, label_visibility="collapsed")
-    with fc[1]:
-        if st.button("🔄 Actualizar", type="primary", use_container_width=True):
-            fetch_live_scores.clear()
-            st.rerun()
+    a, b = st.columns([1, 5])
+    if a.button("🔄 Actualizar", type="primary", use_container_width=True):
+        fetch_live_scores.clear()
+        st.rerun()
 
     live = fetch_live_scores()
     if not live:
         st.markdown('<div class="fh-card"><div class="fh-card-body">'
-                    '<p style="color:rgb(var(--ink2));margin:0;">No hay datos de la jornada disponibles ahora mismo.</p>'
-                    '</div></div>', unsafe_allow_html=True)
+                    '<p style="color:rgb(var(--ink2));margin:0;">No hay datos de la jornada '
+                    'disponibles ahora mismo.</p></div></div>', unsafe_allow_html=True)
         return
 
     live_now = [g for g in live if g["is_live"]]
     prev = [g for g in live if g["state"] == "Preview"]
     finals = [g for g in live if g["is_final"]]
 
-    if tab == "En Directo":
-        games = live_now
-    elif tab == "Finalizados":
-        games = finals
-    elif tab == "Próximos":
-        games = prev
-    else:
-        games = live_now + prev + finals  # orden: en vivo, próximos, finalizados
+    b.markdown(
+        f'<p style="color:rgb(var(--ink2));font-size:13px;margin-top:9px;">'
+        f'🔴 {len(live_now)} en vivo · 🔵 {len(prev)} por comenzar · ✅ {len(finals)} finalizados '
+        f'· {now_local().strftime("%d/%m/%Y")}</p>',
+        unsafe_allow_html=True)
 
-    fecha = now_local().strftime("%d/%m")
-    body = (
-        f'<div class="fh-card"><div class="fh-card-body" style="padding-top:14px;">'
-        f'<div class="fh-league"><span style="color:rgb(var(--warn));">★</span> 🇺🇸 ESTADOS UNIDOS: MLB '
-        f'<span style="color:rgb(var(--fare));">🔴</span>'
-        f'<span class="cls">📅 {fecha} · {len(live_now)} en vivo</span></div>'
-    )
-    if games:
-        body += "".join(match_row_html(g) for g in games)
-    else:
-        body += '<p style="color:rgb(var(--ink2));margin:12px 6px;">Sin partidos en esta pestaña.</p>'
-    body += '</div></div>'
-    st.markdown(body, unsafe_allow_html=True)
+    for titulo, sub, grupo, icono, tono in [
+        ("Marcadores en vivo", "Partidos en curso ahora mismo", live_now, "radio", "live"),
+        ("Próximos partidos", "Aún no comienzan", prev, "sensors", "blue"),
+        ("Finalizados", "Resultado final", finals, "receipt", "neutral"),
+    ]:
+        cuerpo = card_header(titulo, sub, icono, badge(str(len(grupo)), tono))
+        if grupo:
+            cuerpo += f'<div class="fh-grid">{"".join(scoreboard_html(g) for g in grupo)}</div>'
+        else:
+            cuerpo += '<p style="color:rgb(var(--ink2));font-size:13.5px;margin:0;">Nada por aquí.</p>'
+        st.markdown(cuerpo + '</div></div>', unsafe_allow_html=True)
+
     st.caption(f"Datos en caché 60s · última lectura {now_local().strftime('%H:%M:%S')}")
 
 
