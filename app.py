@@ -1415,13 +1415,26 @@ def render_resultados():
     for col in ["Apuestas", "Ganados", "Perdidos", "Pendientes"]:
         daily[col] = daily[col].astype(int)
 
-    section_header("Resumen por día", "Ledger contable: fecha · ganados · perdidos · beneficio · saldo")
+    section_header("Resumen por día",
+                   "Haz clic en una fila para ver el detalle de ese día")
     daily_style = (daily.style
                    .map(_style_pl, subset=["Beneficio", "ROI %"])
                    .format({"Apuestas": "{:d}", "Ganados": "{:d}", "Perdidos": "{:d}", "Pendientes": "{:d}",
                             "Beneficio": "{:+.2f}", "Saldo": "{:.2f}", "ROI %": "{:+.1f}%"}))
-    st.dataframe(daily_style, use_container_width=True, hide_index=True,
-                 height=table_height(len(daily)))
+    # La clave cambia al limpiar, para poder deseleccionar la fila
+    if "daily_key" not in st.session_state:
+        st.session_state.daily_key = 0
+    ev = st.dataframe(daily_style, use_container_width=True, hide_index=True,
+                      height=table_height(len(daily)),
+                      on_select="rerun", selection_mode="single-row",
+                      key=f"daily_sel_{st.session_state.daily_key}")
+    dia_click = None
+    try:
+        filas = ev.selection.rows if ev is not None else []
+        if filas:
+            dia_click = str(daily.iloc[filas[0]]["Fecha"])
+    except Exception:
+        dia_click = None
     st.download_button("⬇ Descargar resumen (CSV)", daily.to_csv(index=False).encode("utf-8-sig"),
                        "bet_ia_resumen_diario.csv", "text/csv")
 
@@ -1442,18 +1455,34 @@ def render_resultados():
     # ---- Filtro de periodo (Hoy · Ayer · Semana · Mes · Calendario) ----
     det["_dia"] = pd.to_datetime(en["date"].astype(str).str[:10], errors="coerce").dt.date
     hoy = now_local().date()
-    fc = st.columns([5, 3])
-    with fc[0]:
-        periodo = st.radio("periodo", ["Todo", "Hoy", "Ayer", "Esta semana", "Este mes", "Calendario"],
-                           index=1,  # predeterminado: HOY
-                           horizontal=True, label_visibility="collapsed", key="det_periodo")
-    rango = None
-    if periodo == "Calendario":
-        with fc[1]:
-            rango = st.date_input("Rango de fechas", value=(hoy - timedelta(days=7), hoy),
-                                  format="DD/MM/YYYY", key="det_rango")
 
-    if periodo == "Hoy":
+    # Si se hizo clic en una fila del resumen, ese dia manda sobre el filtro
+    if dia_click:
+        d = pd.to_datetime(dia_click).date()
+        c1, c2 = st.columns([4, 1])
+        c1.markdown(
+            f'<p style="margin:6px 0;font-size:13.5px;">📌 Mostrando el detalle del '
+            f'<b>{d.strftime("%d/%m/%Y")}</b> <span style="color:rgb(var(--ink2));">'
+            f'(seleccionado en el resumen)</span></p>', unsafe_allow_html=True)
+        if c2.button("✕ Quitar filtro", use_container_width=True):
+            st.session_state.daily_key += 1      # deselecciona la fila
+            st.rerun()
+        periodo, rango, desde, hasta = "Dia", None, d, d
+    else:
+        fc = st.columns([5, 3])
+        with fc[0]:
+            periodo = st.radio("periodo", ["Todo", "Hoy", "Ayer", "Esta semana", "Este mes", "Calendario"],
+                               index=1,  # predeterminado: HOY
+                               horizontal=True, label_visibility="collapsed", key="det_periodo")
+        rango = None
+        if periodo == "Calendario":
+            with fc[1]:
+                rango = st.date_input("Rango de fechas", value=(hoy - timedelta(days=7), hoy),
+                                      format="DD/MM/YYYY", key="det_rango")
+
+    if periodo == "Dia":
+        pass                                     # ya definido arriba
+    elif periodo == "Hoy":
         desde = hasta = hoy
     elif periodo == "Ayer":
         desde = hasta = hoy - timedelta(days=1)
