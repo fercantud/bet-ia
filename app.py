@@ -220,6 +220,15 @@ svg{ display:inline-block; vertical-align:middle; }
 .rt-head h2{ margin:0; font-size:26px; font-weight:800; letter-spacing:-.025em; color:rgb(var(--ink)); line-height:1.1; }
 .rt-head p{ margin:2px 0 0 0 !important; font-size:13px !important; color:rgb(var(--ink2)); }
 
+/* Encabezado de seccion SIN tarjeta: fluye sobre la pagina */
+.rt-sec{ display:flex; align-items:baseline; flex-wrap:wrap; gap:10px; margin:30px 0 14px 0; }
+.rt-sec h3{ margin:0; font-size:17px; font-weight:700; letter-spacing:-.015em;
+    color:rgb(var(--ink)); line-height:1.2; }
+.rt-sec p{ margin:0 !important; font-size:12.5px !important; color:rgb(var(--ink2)); line-height:1.3; }
+.rt-count{ display:inline-block; margin-left:6px; background:rgb(var(--surface2));
+    border:1px solid rgb(var(--line)); border-radius:999px; padding:1px 9px;
+    font-size:12px; font-weight:700; color:rgb(var(--ink2)); vertical-align:middle; }
+
 .rt-sub{ font-size:12.5px; color:rgb(var(--ink2)); margin-left:10px; font-weight:400; }
 .rt-resumen{ font-size:12.5px; color:rgb(var(--ink2)); margin:10px 2px 12px 2px; }
 .rt-resumen b{ font-weight:700; }
@@ -438,6 +447,12 @@ def stat_tile(col, label, value, delta, positive, icon, tone):
         f'<p class="fh-stat-delta {d}">{arrow} {delta}</p></div></div>',
         unsafe_allow_html=True,
     )
+
+
+def page_section(title, subtitle=""):
+    """Encabezado de seccion sin tarjeta: titulo y subtitulo sueltos sobre la pagina."""
+    st.markdown(f'<div class="rt-sec"><h3>{title}</h3><p>{subtitle}</p></div>',
+                unsafe_allow_html=True)
 
 
 def section_header(title, subtitle=""):
@@ -1143,9 +1158,9 @@ def render_matchday_table(live, titulo="Jornada y picks del día"):
     """Tabla unificada: un renglón por partido, con su pick, cuota, EV y resultado."""
     md_rows = build_matchday_rows(live, sorted_bets)
     con_pick = sum(1 for r in md_rows if r["pick"])
+    page_section(titulo, f"{len(live)} partidos · {con_pick} con pick · ordenados por EV")
     st.markdown(
-        card_header(titulo, f"{len(live)} partidos · {con_pick} con pick · ordenados por EV", "receipt")
-        + '<div class="fh-tablewrap"><table class="fh-mtable">'
+        '<div class="fh-tablewrap"><table class="fh-mtable">'
         + '<thead><tr>'
         + '<th class="c-hora">Hora</th><th class="c-est">Estado</th><th>Partido</th>'
         + '<th>Pick</th><th class="num">Prob.</th><th class="num">Cuota</th>'
@@ -1154,7 +1169,7 @@ def render_matchday_table(live, titulo="Jornada y picks del día"):
         + ("".join(match_table_row(r) for r in md_rows)
            or '<tr><td colspan="8" style="padding:16px;color:rgb(var(--ink2));">'
               'Sin partidos en la jornada.</td></tr>')
-        + '</tbody></table></div></div></div>',
+        + '</tbody></table></div>',
         unsafe_allow_html=True)
     return md_rows
 
@@ -1308,7 +1323,8 @@ def render_predicciones():
     won = sum(1 for _, r in board_df.iterrows() if settle_pick(r["PARTIDO"], r["SELECCIÓN"], r["MERCADO"], games) == "WON")
     lost = sum(1 for _, r in board_df.iterrows() if settle_pick(r["PARTIDO"], r["SELECCIÓN"], r["MERCADO"], games) == "LOST")
     sub = f"{len(filtered)} de {len(board_df)} partidos · ✅ {won} ganados · ❌ {lost} perdidos"
-    body = card_header("Tablero de Oportunidades +EV", sub, "bar")
+    page_section("Tablero de Oportunidades +EV", sub)
+    body = ""
     if len(filtered):
         cards = "".join(
             pick_card_html(r, settle_pick(r["PARTIDO"], r["SELECCIÓN"], r["MERCADO"], games))
@@ -1317,7 +1333,6 @@ def render_predicciones():
         body += f'<div class="fh-grid picks">{cards}</div>'
     else:
         body += '<p style="color:rgb(var(--ink2));">Sin partidos con estos filtros.</p>'
-    body += '</div></div>'
     st.markdown(body, unsafe_allow_html=True)
 
     with st.expander("🔍 Mercados analizados (desglose técnico)"):
@@ -1363,12 +1378,12 @@ def render_en_vivo():
         ("Próximos partidos", "Aún no comienzan", prev, "sensors", "blue"),
         ("Finalizados", "Resultado final", finals, "receipt", "neutral"),
     ]:
-        cuerpo = card_header(titulo, sub, icono, badge(str(len(grupo)), tono))
+        page_section(f'{titulo} <span class="rt-count">{len(grupo)}</span>', sub)
         if grupo:
-            cuerpo += f'<div class="fh-grid">{"".join(scoreboard_html(g) for g in grupo)}</div>'
+            cuerpo = f'<div class="fh-grid">{"".join(scoreboard_html(g) for g in grupo)}</div>'
         else:
-            cuerpo += '<p style="color:rgb(var(--ink2));font-size:13.5px;margin:0;">Nada por aquí.</p>'
-        st.markdown(cuerpo + '</div></div>', unsafe_allow_html=True)
+            cuerpo = '<p style="color:rgb(var(--ink2));font-size:13.5px;margin:0;">Nada por aquí.</p>'
+        st.markdown(cuerpo, unsafe_allow_html=True)
 
     st.caption(f"Datos en caché 60s · última lectura {now_local().strftime('%H:%M:%S')}")
 
@@ -1474,9 +1489,7 @@ def render_resultados():
     for col in ["Apuestas", "Ganados", "Perdidos", "Pendientes"]:
         daily[col] = daily[col].astype(int)
 
-    st.markdown(card_header("Resumen diario",
-                            "Haz clic en una fila para ver el detalle de ese día", "bar"),
-                unsafe_allow_html=True)
+    page_section("Resumen diario", "Haz clic en una fila para ver el detalle de ese día")
     daily_style = (daily.style
                    .map(_style_pl, subset=["Beneficio", "ROI %"])
                    .format({"Apuestas": "{:d}", "Ganados": "{:d}", "Perdidos": "{:d}", "Pendientes": "{:d}",
@@ -1497,7 +1510,6 @@ def render_resultados():
         dia_click = None
     st.download_button("⬇ Descargar resumen (CSV)", daily.to_csv(index=False).encode("utf-8-sig"),
                        "bet_ia_resumen_diario.csv", "text/csv")
-    st.markdown('</div></div>', unsafe_allow_html=True)   # cierra tarjeta del resumen
 
     # ---- Tabla Excel 2: detalle por pick ----
     det = pd.DataFrame({
@@ -1511,9 +1523,7 @@ def render_resultados():
         "Saldo": en["saldo"],
     })
 
-    st.markdown(card_header("Detalle por apuesta",
-                            "Cada pick con su beneficio y saldo acumulado", "receipt"),
-                unsafe_allow_html=True)
+    page_section("Detalle por apuesta", "Cada pick con su beneficio y saldo acumulado")
 
     # ---- Filtro de periodo (Hoy · Ayer · Semana · Mes · Calendario) ----
     det["_dia"] = pd.to_datetime(en["date"].astype(str).str[:10], errors="coerce").dt.date
@@ -1604,11 +1614,10 @@ def render_resultados():
 
     st.download_button("⬇ Descargar detalle (CSV)", det_f.to_csv(index=False).encode("utf-8-sig"),
                        "bet_ia_detalle_picks.csv", "text/csv")
-    st.markdown('</div></div>', unsafe_allow_html=True)   # cierra tarjeta del detalle
 
     # ---- Respaldo del historial (clave en la nube: el disco es efímero) ----
-    section_header("Respaldo del historial",
-                   "Descarga el archivo para conservarlo; restáuralo tras un redeploy")
+    page_section("Respaldo del historial",
+                 "Descarga el archivo para conservarlo; restáuralo tras un redeploy")
     rb1, rb2 = st.columns(2)
     with rb1:
         try:
@@ -1646,7 +1655,7 @@ def render_resultados():
                     update_result(row["id"], choice, row["odds"], row["kelly_stake"])
                     st.rerun()
 
-    section_header("Evolución del saldo", "Bankroll acumulado en el tiempo")
+    page_section("Evolución del saldo", "Bankroll acumulado en el tiempo")
     st.line_chart(en.set_index("date")["saldo"])
 
 
