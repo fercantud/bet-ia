@@ -1297,43 +1297,21 @@ def render_dashboard():
 # PÁGINA: Predicciones
 # ---------------------------------------------------------------------------
 def render_predicciones():
-    topbar("Predicciones", "Oportunidades +EV del sistema multi-agente · filtra por mercado, riesgo y score", "target")
-
-    fc = st.columns([2, 2, 3, 2])
-    markets = sorted(board_df["MERCADO"].unique().tolist())
-    risks = sorted(board_df["RIESGO"].unique().tolist())
-    market_filter = fc[0].multiselect("Mercado", markets, default=markets)
-    risk_filter = fc[1].multiselect("Riesgo", risks, default=risks)
-    min_score = fc[2].slider("Score mínimo", 0, 100, 0)
-    only_ev = fc[3].checkbox("Solo +EV", value=False)
-
-    filtered = board_df[
-        board_df["MERCADO"].isin(market_filter)
-        & board_df["RIESGO"].isin(risk_filter)
-        & (board_df["SCORE"] >= min_score)
-    ]
-    if only_ev:
-        filtered = filtered[filtered["EV"] > 0]
-
     games = fetch_live_scores()
-
-    # El parlay del dia, arriba del tablero
-    st.markdown(parlay_card_html(build_parlay(sorted_bets, games), games), unsafe_allow_html=True)
+    filtered = board_df                      # sin filtros: se muestran todos los picks
 
     won = sum(1 for _, r in board_df.iterrows() if settle_pick(r["PARTIDO"], r["SELECCIÓN"], r["MERCADO"], games) == "WON")
     lost = sum(1 for _, r in board_df.iterrows() if settle_pick(r["PARTIDO"], r["SELECCIÓN"], r["MERCADO"], games) == "LOST")
-    sub = f"{len(filtered)} de {len(board_df)} partidos · ✅ {won} ganados · ❌ {lost} perdidos"
+    sub = f"{len(board_df)} partidos · ✅ {won} ganados · ❌ {lost} perdidos"
     page_section("Tablero de Oportunidades +EV", sub)
-    body = ""
     if len(filtered):
         cards = "".join(
             pick_card_html(r, settle_pick(r["PARTIDO"], r["SELECCIÓN"], r["MERCADO"], games))
             for _, r in filtered.iterrows()
         )
-        body += f'<div class="fh-grid picks">{cards}</div>'
+        st.markdown(f'<div class="fh-grid picks">{cards}</div>', unsafe_allow_html=True)
     else:
-        body += '<p style="color:rgb(var(--ink2));">Sin partidos con estos filtros.</p>'
-    st.markdown(body, unsafe_allow_html=True)
+        st.markdown('<p style="color:rgb(var(--ink2));">Sin picks para hoy.</p>', unsafe_allow_html=True)
 
     with st.expander("🔍 Mercados analizados (desglose técnico)"):
         for b in sorted_bets[:3]:
@@ -1342,6 +1320,10 @@ def render_predicciones():
             st.markdown("➔ *Total Runs* | Prob: 55.0% | Edge: +3.0% | EV: +2.1%")
             st.markdown("➔ *First 5 (F5)* | Prob: 58.0% | Edge: +4.2% | EV: +3.0%")
             st.markdown("")
+
+    # El parlay del dia, hasta abajo
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+    st.markdown(parlay_card_html(build_parlay(sorted_bets, games), games), unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------

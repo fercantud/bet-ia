@@ -49,7 +49,8 @@
       "Bash(git commit -q -m 'Mover Marcadores en vivo del Dashboard a la pestana En Vivo *)",
       "Bash(git commit -q -m 'Resultados: al hacer clic en un dia del resumen se filtra el detalle *)",
       "Bash(git commit -q -m 'Rediseno de la pestana Resultados *)",
-      "Bash(git commit -q -m 'Diseno plano: quitar las cajas que envolvian las tablas *)"
+      "Bash(git commit -q -m 'Diseno plano: quitar las cajas que envolvian las tablas *)",
+      "Bash(git commit -q -m 'Predicciones: quitar filtros y mover el parlay al final *)"
     ]
   }
 }
