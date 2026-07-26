@@ -38,7 +38,11 @@ class OddsDataFetcher:
                 if not bookmakers:
                     continue
 
-                home_ml, away_ml, over_ml, under_ml, lines = [], [], [], [], []
+                home_ml, away_ml = [], []
+                # Totales agrupados POR LINEA. No se promedian las lineas: cada casa
+                # ofrece escalones fijos (7, 7.5, 8, 8.5, 9, 9.5, 10) y promediarlos
+                # produce valores inexistentes (9.8, 8.6...) que no se pueden apostar.
+                por_linea = {}
 
                 for bm in bookmakers:
                     for market in bm.get("markets", []):
@@ -51,12 +55,14 @@ class OddsDataFetcher:
                                     away_ml.append(o["price"])
                         elif key == "totals":
                             for o in market.get("outcomes", []):
+                                punto = o.get("point")
+                                if punto is None:
+                                    continue
+                                d = por_linea.setdefault(float(punto), {"over": [], "under": []})
                                 if o.get("name") == "Over":
-                                    over_ml.append(o["price"])
-                                    if o.get("point") is not None:
-                                        lines.append(o["point"])
+                                    d["over"].append(o["price"])
                                 elif o.get("name") == "Under":
-                                    under_ml.append(o["price"])
+                                    d["under"].append(o["price"])
 
                 if not (home_ml and away_ml):
                     continue
@@ -65,10 +71,18 @@ class OddsDataFetcher:
                     "home_odds": round(sum(home_ml) / len(home_ml), 2),
                     "away_odds": round(sum(away_ml) / len(away_ml), 2),
                 }
-                if over_ml and under_ml:
-                    entry["over_odds"] = round(sum(over_ml) / len(over_ml), 2)
-                    entry["under_odds"] = round(sum(under_ml) / len(under_ml), 2)
-                    entry["total_line"] = round(sum(lines) / len(lines), 1) if lines else 8.5
+
+                # Se toma la linea MAS OFRECIDA (la moda) y, con ella, solo las cuotas
+                # de las casas que realmente la ofrecen. Empates: gana la linea menor.
+                validas = {ln: d for ln, d in por_linea.items() if d["over"] and d["under"]}
+                if validas:
+                    linea = sorted(validas, key=lambda ln: (-len(validas[ln]["over"]), ln))[0]
+                    d = validas[linea]
+                    entry["over_odds"] = round(sum(d["over"]) / len(d["over"]), 2)
+                    entry["under_odds"] = round(sum(d["under"]) / len(d["under"]), 2)
+                    entry["total_line"] = linea
+                    entry["line_books"] = len(d["over"])          # casas que la ofrecen
+                    entry["line_total_books"] = sum(len(x["over"]) for x in validas.values())
 
                 odds_dict[f"{away_team} @ {home_team}"] = entry
 

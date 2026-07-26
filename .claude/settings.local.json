@@ -41,7 +41,9 @@
       "Bash(git commit -q -m 'Semilla fija por fecha: analisis reproducible entre instancias *)",
       "Bash(venv/Scripts/python.exe -c \"import ast; [ast.parse\\(open\\(f,encoding='utf-8'\\).read\\(\\)\\) for f in ['main.py','decision_ranking.py','app.py']]; print\\('syntax OK'\\)\")",
       "Bash(PYTHONIOENCODING=utf-8 ODDS_API_KEY=d3afa5d696a5ed1ecca697f0d7e27c7d venv/Scripts/python.exe -c ' *)",
-      "Bash(git commit -q -m 'Arreglo: usar la linea REAL de totales en vez de asumir 8.5 *)"
+      "Bash(git commit -q -m 'Arreglo: usar la linea REAL de totales en vez de asumir 8.5 *)",
+      "Bash(git commit -q -m 'Dashboard: quitar la tabla de la jornada \\(ya vive en su propia pestana\\) *)",
+      "Bash(git commit -q -m 'Parlay del dia + lineas de total reales \\(no promediadas\\) *)"
     ]
   }
 }

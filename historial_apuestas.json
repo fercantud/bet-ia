@@ -323,8 +323,8 @@
    "ev": 0.3014,
    "kelly_stake": 0.03,
    "model_confidence": 8.7,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "WON",
+   "profit_loss": 0.024
   },
   {
    "id": 87,
@@ -339,8 +339,8 @@
    "ev": 0.27,
    "kelly_stake": 0.02,
    "model_confidence": 8.3,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "WON",
+   "profit_loss": 0.018
   },
   {
    "id": 88,
@@ -355,8 +355,8 @@
    "ev": 0.2217,
    "kelly_stake": 0.01,
    "model_confidence": 7.9,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "WON",
+   "profit_loss": 0.0098
   },
   {
    "id": 89,
@@ -371,8 +371,8 @@
    "ev": 0.214,
    "kelly_stake": 0.01,
    "model_confidence": 7.9,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "WON",
+   "profit_loss": 0.0093
   },
   {
    "id": 90,
@@ -387,8 +387,8 @@
    "ev": 0.2134,
    "kelly_stake": 0.02,
    "model_confidence": 8.3,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "WON",
+   "profit_loss": 0.014199999999999999
   },
   {
    "id": 91,
@@ -403,8 +403,8 @@
    "ev": 0.166,
    "kelly_stake": 0.02,
    "model_confidence": 8.0,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "WON",
+   "profit_loss": 0.017200000000000003
   },
   {
    "id": 92,
@@ -419,8 +419,8 @@
    "ev": 0.1355,
    "kelly_stake": 0.01,
    "model_confidence": 7.7,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "WON",
+   "profit_loss": 0.0089
   },
   {
    "id": 93,
@@ -435,8 +435,8 @@
    "ev": 0.1016,
    "kelly_stake": 0.01,
    "model_confidence": 7.0,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "LOST",
+   "profit_loss": -0.01
   },
   {
    "id": 94,
@@ -451,8 +451,8 @@
    "ev": 0.0854,
    "kelly_stake": 0.01,
    "model_confidence": 7.5,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "LOST",
+   "profit_loss": -0.01
   },
   {
    "id": 95,
@@ -467,8 +467,8 @@
    "ev": 0.0824,
    "kelly_stake": 0.01,
    "model_confidence": 7.3,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "LOST",
+   "profit_loss": -0.01
   },
   {
    "id": 96,
@@ -483,8 +483,8 @@
    "ev": 0.0744,
    "kelly_stake": 0.01,
    "model_confidence": 7.6,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "WON",
+   "profit_loss": 0.0063999999999999994
   },
   {
    "id": 97,
@@ -499,8 +499,8 @@
    "ev": 0.0433,
    "kelly_stake": 0.01,
    "model_confidence": 7.0,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "LOST",
+   "profit_loss": -0.01
   },
   {
    "id": 98,
@@ -515,8 +515,8 @@
    "ev": 0.0433,
    "kelly_stake": 0.01,
    "model_confidence": 6.9,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "WON",
+   "profit_loss": 0.0089
   },
   {
    "id": 99,
@@ -531,8 +531,8 @@
    "ev": 0.0081,
    "kelly_stake": 0.01,
    "model_confidence": 6.6,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "WON",
+   "profit_loss": 0.008600000000000002
   },
   {
    "id": 100,
@@ -547,6 +547,246 @@
    "ev": -0.0461,
    "kelly_stake": 0.0,
    "model_confidence": 6.6,
+   "result": "LOST",
+   "profit_loss": -0.0
+  },
+  {
+   "id": 101,
+   "date": "2026-07-26 09:00:00",
+   "matchup": "Arizona Diamondbacks @ Washington Nationals",
+   "selection": "Arizona Diamondbacks",
+   "market": "ML",
+   "model_prob": 0.7276,
+   "market_prob": 0.5319,
+   "edge": 0.1957,
+   "odds": 1.88,
+   "ev": 0.3679,
+   "kelly_stake": 0.03,
+   "model_confidence": 8.7,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 102,
+   "date": "2026-07-26 09:01:00",
+   "matchup": "Houston Astros @ Chicago White Sox",
+   "selection": "Chicago White Sox",
+   "market": "ML",
+   "model_prob": 0.7188,
+   "market_prob": 0.5263,
+   "edge": 0.1925,
+   "odds": 1.9,
+   "ev": 0.3657,
+   "kelly_stake": 0.03,
+   "model_confidence": 8.6,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 103,
+   "date": "2026-07-26 09:02:00",
+   "matchup": "Athletics @ Minnesota Twins",
+   "selection": "Over 10",
+   "market": "TOTAL",
+   "model_prob": 0.616,
+   "market_prob": 0.5128,
+   "edge": 0.1032,
+   "odds": 1.95,
+   "ev": 0.2012,
+   "kelly_stake": 0.01,
+   "model_confidence": 7.9,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 104,
+   "date": "2026-07-26 09:03:00",
+   "matchup": "San Diego Padres @ Miami Marlins",
+   "selection": "Over 8.5",
+   "market": "TOTAL",
+   "model_prob": 0.641,
+   "market_prob": 0.5376,
+   "edge": 0.1034,
+   "odds": 1.86,
+   "ev": 0.1923,
+   "kelly_stake": 0.02,
+   "model_confidence": 8.1,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 105,
+   "date": "2026-07-26 09:04:00",
+   "matchup": "Los Angeles Dodgers @ New York Mets",
+   "selection": "Over 8.5",
+   "market": "TOTAL",
+   "model_prob": 0.639,
+   "market_prob": 0.5435,
+   "edge": 0.0955,
+   "odds": 1.84,
+   "ev": 0.1758,
+   "kelly_stake": 0.02,
+   "model_confidence": 8.0,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 106,
+   "date": "2026-07-26 09:05:00",
+   "matchup": "Chicago Cubs @ Pittsburgh Pirates",
+   "selection": "Pittsburgh Pirates",
+   "market": "ML",
+   "model_prob": 0.6317,
+   "market_prob": 0.5587,
+   "edge": 0.073,
+   "odds": 1.79,
+   "ev": 0.1307,
+   "kelly_stake": 0.01,
+   "model_confidence": 7.9,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 107,
+   "date": "2026-07-26 09:06:00",
+   "matchup": "Toronto Blue Jays @ Boston Red Sox",
+   "selection": "Boston Red Sox",
+   "market": "ML",
+   "model_prob": 0.6565,
+   "market_prob": 0.5882,
+   "edge": 0.0683,
+   "odds": 1.7,
+   "ev": 0.116,
+   "kelly_stake": 0.02,
+   "model_confidence": 8.1,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 108,
+   "date": "2026-07-26 09:07:00",
+   "matchup": "Colorado Rockies @ Milwaukee Brewers",
+   "selection": "Milwaukee Brewers",
+   "market": "ML",
+   "model_prob": 0.8335,
+   "market_prob": 0.7752,
+   "edge": 0.0583,
+   "odds": 1.29,
+   "ev": 0.0752,
+   "kelly_stake": 0.02,
+   "model_confidence": 8.4,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 109,
+   "date": "2026-07-26 09:08:00",
+   "matchup": "Los Angeles Angels @ San Francisco Giants",
+   "selection": "Under 8.5",
+   "market": "TOTAL",
+   "model_prob": 0.556,
+   "market_prob": 0.5291,
+   "edge": 0.0269,
+   "odds": 1.89,
+   "ev": 0.0508,
+   "kelly_stake": 0.01,
+   "model_confidence": 6.9,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 110,
+   "date": "2026-07-26 09:09:00",
+   "matchup": "Atlanta Braves @ Baltimore Orioles",
+   "selection": "Under 8.5",
+   "market": "TOTAL",
+   "model_prob": 0.522,
+   "market_prob": 0.4975,
+   "edge": 0.0245,
+   "odds": 2.01,
+   "ev": 0.0492,
+   "kelly_stake": 0.01,
+   "model_confidence": 6.7,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 111,
+   "date": "2026-07-26 09:10:00",
+   "matchup": "Seattle Mariners @ Texas Rangers",
+   "selection": "Seattle Mariners",
+   "market": "ML",
+   "model_prob": 0.5061,
+   "market_prob": 0.5128,
+   "edge": -0.0067,
+   "odds": 1.95,
+   "ev": -0.0131,
+   "kelly_stake": 0.0,
+   "model_confidence": 6.3,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 112,
+   "date": "2026-07-26 09:11:00",
+   "matchup": "Cincinnati Reds @ St. Louis Cardinals",
+   "selection": "St. Louis Cardinals",
+   "market": "ML",
+   "model_prob": 0.5522,
+   "market_prob": 0.5682,
+   "edge": -0.016,
+   "odds": 1.76,
+   "ev": -0.0281,
+   "kelly_stake": 0.0,
+   "model_confidence": 6.5,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 113,
+   "date": "2026-07-26 09:12:00",
+   "matchup": "New York Yankees @ Philadelphia Phillies",
+   "selection": "Philadelphia Phillies",
+   "market": "ML",
+   "model_prob": 0.6316,
+   "market_prob": 0.6536,
+   "edge": -0.022,
+   "odds": 1.53,
+   "ev": -0.0337,
+   "kelly_stake": 0.0,
+   "model_confidence": 7.1,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 114,
+   "date": "2026-07-26 09:13:00",
+   "matchup": "Cleveland Guardians @ Tampa Bay Rays",
+   "selection": "Under 7",
+   "market": "TOTAL",
+   "model_prob": 0.53,
+   "market_prob": 0.5556,
+   "edge": -0.0256,
+   "odds": 1.8,
+   "ev": -0.046,
+   "kelly_stake": 0.0,
+   "model_confidence": 6.3,
+   "result": "PENDING",
+   "profit_loss": 0.0
+  },
+  {
+   "id": 115,
+   "date": "2026-07-26 09:14:00",
+   "matchup": "Kansas City Royals @ Detroit Tigers",
+   "selection": "Detroit Tigers",
+   "market": "ML",
+   "model_prob": 0.5325,
+   "market_prob": 0.6494,
+   "edge": -0.1169,
+   "odds": 1.54,
+   "ev": -0.18,
+   "kelly_stake": 0.0,
+   "model_confidence": 5.5,
    "result": "PENDING",
    "profit_loss": 0.0
   }

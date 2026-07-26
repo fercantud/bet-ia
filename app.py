@@ -211,6 +211,33 @@ svg{ display:inline-block; vertical-align:middle; }
 .tp-track{ flex:1; height:6px; border-radius:999px; background:rgb(var(--surface2)); overflow:hidden; }
 .tp-track i{ display:block; height:100%; border-radius:999px; }
 
+/* ---- Parlay del dia (checklist) ---- */
+.pl-legs{ padding:6px 16px 0 16px; }
+.pl-leg{ display:flex; align-items:center; gap:10px; padding:9px 0;
+    border-bottom:1px solid rgb(var(--line)); }
+.pl-leg:last-child{ border-bottom:none; }
+.pl-check{ width:20px; height:20px; border-radius:6px; flex-shrink:0; display:flex;
+    align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#fff;
+    border:1.5px solid rgb(var(--line)); background:rgb(var(--surface2)); }
+.pl-check.won{ background:rgb(var(--save)); border-color:rgb(var(--save)); }
+.pl-check.lost{ background:rgb(var(--fare)); border-color:rgb(var(--fare)); }
+.pl-check.push{ background:rgb(var(--warn)); border-color:rgb(var(--warn)); }
+.pl-logo img{ width:22px; height:22px; object-fit:contain; display:block; }
+.pl-txt{ display:flex; flex-direction:column; min-width:0; flex:1; }
+.pl-txt b{ font-size:13px; font-weight:700; color:rgb(var(--ink)); line-height:1.2; }
+.pl-txt span{ font-size:11px; color:rgb(var(--ink2)); overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+.pl-prob{ font-size:12.5px; font-weight:700; color:rgb(var(--ink)); font-variant-numeric:tabular-nums; }
+.pl-odds{ font-size:12px; color:rgb(var(--ink2)); font-variant-numeric:tabular-nums; min-width:34px; text-align:right; }
+.pl-leg.lost .pl-txt b{ color:rgb(var(--fare)); text-decoration:line-through; }
+.pl-leg.won .pl-txt b{ color:rgb(var(--save)); }
+.pl-foot{ display:flex; gap:10px; padding:12px 16px; margin-top:4px;
+    border-top:1px solid rgb(var(--line)); background:rgb(var(--surface2)/0.5); }
+.pl-foot div{ flex:1; display:flex; flex-direction:column; gap:2px; }
+.pl-foot span{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:rgb(var(--ink2)); }
+.pl-foot b{ font-size:16px; font-weight:800; color:rgb(var(--ink)); font-variant-numeric:tabular-nums; }
+.pl-foot b.pos{ color:rgb(var(--save)); } .pl-foot b.neg{ color:rgb(var(--fare)); }
+
 /* ---- Tabla unificada de la jornada (estilo Bloomberg/ESPN) ---- */
 /* sin alto maximo: se ven todas las filas, sin scroll vertical interno */
 .fh-tablewrap{ overflow-x:auto; border-radius:10px; }
@@ -910,6 +937,80 @@ def pick_label(bet):
     return sel  # TOTAL ('Over 8.5') y F5 ('... F5') ya vienen descriptivos
 
 
+def build_parlay(bets, games, n=3):
+    """Arma el parlay MAS SEGURO del dia: las n selecciones con mayor probabilidad
+    del modelo entre los picks aprobados (+EV). Se prioriza la probabilidad, no la
+    cuota. Devuelve las patas, la probabilidad y cuota combinadas y el estado."""
+    aprobados = [b for b in bets if b.get("approved")]
+    patas = sorted(aprobados, key=lambda b: -float(b["prob_model"]))[:n]
+    if not patas:
+        return None
+
+    prob = 1.0
+    cuota = 1.0
+    for b in patas:
+        prob *= float(b["prob_model"])
+        cuota *= float(b["odds"])
+        b_res = settle_pick(b["matchup"], b["selection"], b["market"], games)
+        b["_res"] = b_res
+
+    if any(b["_res"] == "LOST" for b in patas):
+        estado = "LOST"
+    elif all(b["_res"] == "WON" for b in patas):
+        estado = "WON"
+    else:
+        estado = "PENDING"
+
+    return {
+        "patas": patas,
+        "prob": prob,
+        "cuota": round(cuota, 2),
+        "ev": prob * cuota - 1.0,
+        "estado": estado,
+        "ganadas": sum(1 for b in patas if b["_res"] == "WON"),
+    }
+
+
+def parlay_card_html(p, games):
+    """Tarjeta del parlay con checklist por pata."""
+    if not p:
+        return ('<div class="fh-card"><div class="fh-card-body">'
+                '<p style="color:rgb(var(--ink2));margin:0;">Hoy no hay picks aprobados '
+                'para armar un parlay.</p></div></div>')
+
+    est = {
+        "WON": (badge("✅ GANADO", "save"), "won"),
+        "LOST": (badge("❌ PERDIDO", "fare"), "lost"),
+        "PENDING": (badge(f'⏳ {p["ganadas"]}/{len(p["patas"])} listas', "warn"), ""),
+    }[p["estado"]]
+
+    filas = ""
+    for b in p["patas"]:
+        r = b.get("_res")
+        cls, ico = {"WON": ("won", "✓"), "LOST": ("lost", "✗"),
+                    "PUSH": ("push", "=")}.get(r, ("pend", ""))
+        filas += (
+            f'<div class="pl-leg {cls}">'
+            f'<span class="pl-check {cls}">{ico}</span>'
+            f'<span class="pl-logo">{logo_for_team(b["selection"], games)}</span>'
+            f'<div class="pl-txt"><b>{pick_label(b)}</b>'
+            f'<span>{b["matchup"]}</span></div>'
+            f'<span class="pl-prob">{b["prob_model"]:.0%}</span>'
+            f'<span class="pl-odds">{b["odds"]:.2f}</span></div>'
+        )
+
+    return (
+        card_header("El Parlay de Hoy", f'{len(p["patas"])} selecciones más seguras',
+                    "trophy", est[0])
+        + f'<div class="pl-legs {est[1]}">{filas}</div>'
+        + f'<div class="pl-foot">'
+        f'<div><span>Probabilidad</span><b>{p["prob"]:.1%}</b></div>'
+        f'<div><span>Cuota total</span><b>{p["cuota"]:.2f}</b></div>'
+        f'<div><span>EV</span><b class="{"pos" if p["ev"] > 0 else "neg"}">{p["ev"]:+.1%}</b></div>'
+        f'</div></div></div>'
+    )
+
+
 def build_matchday_rows(games, bets):
     """Une la agenda real y los picks en UNA fila por partido (sin duplicados).
     Orden: En vivo primero, luego próximos por hora, y al final los finalizados."""
@@ -1161,6 +1262,9 @@ def render_dashboard():
             f'</div></div></div>',
             unsafe_allow_html=True,
         )
+        # El parlay va aqui, aprovechando el espacio libre bajo el Chief Tipster
+        st.markdown(parlay_card_html(build_parlay(sorted_bets, live), live),
+                    unsafe_allow_html=True)
 
     # La tabla de la jornada vive ahora en su propia pestaña "Jornada de hoy",
     # asi que aqui no se repite.
@@ -1209,6 +1313,10 @@ def render_predicciones():
         filtered = filtered[filtered["EV"] > 0]
 
     games = fetch_live_scores()
+
+    # El parlay del dia, arriba del tablero
+    st.markdown(parlay_card_html(build_parlay(sorted_bets, games), games), unsafe_allow_html=True)
+
     won = sum(1 for _, r in board_df.iterrows() if settle_pick(r["PARTIDO"], r["SELECCIÓN"], r["MERCADO"], games) == "WON")
     lost = sum(1 for _, r in board_df.iterrows() if settle_pick(r["PARTIDO"], r["SELECCIÓN"], r["MERCADO"], games) == "LOST")
     sub = f"{len(filtered)} de {len(board_df)} partidos · ✅ {won} ganados · ❌ {lost} perdidos"
