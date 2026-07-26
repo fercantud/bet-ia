@@ -3,6 +3,8 @@ import os
 import sqlite3
 from datetime import datetime, timedelta
 
+import requests
+
 # Zona horaria fija: sin esto, la app usa el reloj del servidor. En Streamlit Cloud
 # ese reloj es UTC, asi que a las 18:00 de Mexico ya seria "manana" y la nube
 # generaria una jornada distinta a la de tu PC. Con esto ambas ven el mismo dia.
@@ -210,6 +212,37 @@ svg{ display:inline-block; vertical-align:middle; }
 .tp-bar b{ width:38px; text-align:right; color:rgb(var(--ink)); font-variant-numeric:tabular-nums; font-size:12px; }
 .tp-track{ flex:1; height:6px; border-radius:999px; background:rgb(var(--surface2)); overflow:hidden; }
 .tp-track i{ display:block; height:100%; border-radius:999px; }
+
+/* ---- Pagina Resultados: titulo y tabla de detalle ---- */
+.rt-head{ display:flex; align-items:center; gap:13px; margin:2px 0 20px 0; }
+.rt-head-ico{ width:42px; height:42px; border-radius:12px; background:rgb(var(--accent)/0.12);
+    color:rgb(var(--accent)); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.rt-head h2{ margin:0; font-size:26px; font-weight:800; letter-spacing:-.025em; color:rgb(var(--ink)); line-height:1.1; }
+.rt-head p{ margin:2px 0 0 0 !important; font-size:13px !important; color:rgb(var(--ink2)); }
+
+.rt-sub{ font-size:12.5px; color:rgb(var(--ink2)); margin-left:10px; font-weight:400; }
+.rt-resumen{ font-size:12.5px; color:rgb(var(--ink2)); margin:10px 2px 12px 2px; }
+.rt-resumen b{ font-weight:700; }
+
+.rt-wrap{ overflow-x:auto; border:1px solid rgb(var(--line)); border-radius:12px; }
+.rt-table{ width:100%; border-collapse:separate; border-spacing:0; font-size:12.5px; }
+.rt-table thead th{ background:rgb(var(--surface2)); color:rgb(var(--ink2)); font-size:10px;
+    font-weight:700; letter-spacing:.07em; text-transform:uppercase; text-align:left;
+    padding:11px 14px; white-space:nowrap; border-bottom:1px solid rgb(var(--line)); }
+.rt-table tbody td{ padding:10px 14px; border-bottom:1px solid rgb(var(--line));
+    vertical-align:middle; white-space:nowrap; }
+.rt-table tbody tr:last-child td{ border-bottom:none; }
+.rt-table tbody tr:hover td{ background:rgb(var(--surface2)/0.5); }
+.rt-table .num{ text-align:right; font-variant-numeric:tabular-nums; }
+.rt-table .fecha{ color:rgb(var(--ink2)); font-variant-numeric:tabular-nums; }
+.rt-game{ display:flex; align-items:center; gap:7px; }
+.rt-game img{ width:20px; height:20px; object-fit:contain; flex-shrink:0; }
+.rt-nologo{ width:20px; text-align:center; display:inline-block; }
+.rt-game span.nm{ color:rgb(var(--ink)); font-weight:500; }
+.rt-sel{ font-weight:600; color:rgb(var(--ink)); }
+.rt-pl.pos{ color:rgb(var(--save)); font-weight:700; }
+.rt-pl.neg{ color:rgb(var(--fare)); font-weight:700; }
+.rt-pl.zero{ color:rgb(var(--ink2)); }
 
 /* ---- Chief Tipster: rejilla compacta ---- */
 .ct-grid{ margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; }
@@ -787,6 +820,29 @@ auto_settle_db(fetch_live_scores())
 LIVE_COUNT = len([g for g in fetch_live_scores() if g["is_live"]])
 
 
+@st.cache_data(ttl=86400)
+def mlb_team_ids():
+    """Mapa nombre de equipo -> id, para poder mostrar logos de cualquier fecha."""
+    try:
+        r = requests.get("https://statsapi.mlb.com/api/v1/teams?sportId=1", timeout=8).json()
+        return {t["name"]: t["id"] for t in r.get("teams", [])}
+    except Exception:
+        return {}
+
+
+def logos_for_matchup(matchup):
+    """Los dos logos de un enfrentamiento 'Visitante @ Local'."""
+    ids = mlb_team_ids()
+    partes = str(matchup).replace(" @ ", "|").replace(" vs ", "|").split("|")
+    out = ""
+    for p in partes[:2]:
+        p = p.strip()
+        tid = ids.get(p) or next((v for k, v in ids.items() if _team_match(k, p)), None)
+        out += (f'<img src="https://www.mlbstatic.com/team-logos/{tid}.svg" alt=""/>'
+                if tid else '<span class="rt-nologo">⚾</span>')
+    return out
+
+
 def logo_for_team(name, games):
     """Devuelve el <img> del logo del equipo buscándolo en los partidos de la jornada."""
     for g in games:
@@ -1358,7 +1414,10 @@ def _style_res(v):
 
 
 def render_resultados():
-    topbar("Resultados", "Cierre automático contra la MLB · ledger tipo Excel", "receipt")
+    st.markdown(
+        f'<div class="rt-head"><div class="rt-head-ico">{svg("receipt", 22)}</div>'
+        f'<div><h2>Resultados</h2><p>Resumen de rendimiento y detalle por apuesta</p></div></div>',
+        unsafe_allow_html=True)
 
     hist = load_history()
     if hist.empty:
@@ -1415,8 +1474,9 @@ def render_resultados():
     for col in ["Apuestas", "Ganados", "Perdidos", "Pendientes"]:
         daily[col] = daily[col].astype(int)
 
-    section_header("Resumen por día",
-                   "Haz clic en una fila para ver el detalle de ese día")
+    st.markdown(card_header("Resumen diario",
+                            "Haz clic en una fila para ver el detalle de ese día", "bar"),
+                unsafe_allow_html=True)
     daily_style = (daily.style
                    .map(_style_pl, subset=["Beneficio", "ROI %"])
                    .format({"Apuestas": "{:d}", "Ganados": "{:d}", "Perdidos": "{:d}", "Pendientes": "{:d}",
@@ -1437,6 +1497,7 @@ def render_resultados():
         dia_click = None
     st.download_button("⬇ Descargar resumen (CSV)", daily.to_csv(index=False).encode("utf-8-sig"),
                        "bet_ia_resumen_diario.csv", "text/csv")
+    st.markdown('</div></div>', unsafe_allow_html=True)   # cierra tarjeta del resumen
 
     # ---- Tabla Excel 2: detalle por pick ----
     det = pd.DataFrame({
@@ -1450,7 +1511,9 @@ def render_resultados():
         "Saldo": en["saldo"],
     })
 
-    section_header("Detalle por apuesta", "Cada pick con su beneficio y saldo acumulado")
+    st.markdown(card_header("Detalle por apuesta",
+                            "Cada pick con su beneficio y saldo acumulado", "receipt"),
+                unsafe_allow_html=True)
 
     # ---- Filtro de periodo (Hoy · Ayer · Semana · Mes · Calendario) ----
     det["_dia"] = pd.to_datetime(en["date"].astype(str).str[:10], errors="coerce").dt.date
@@ -1508,21 +1571,40 @@ def render_resultados():
         ben = float(det_f["Beneficio"].sum())
         color = "var(--save)" if ben >= 0 else "var(--fare)"
         st.markdown(
-            f'<p style="font-size:13px;color:rgb(var(--ink2));margin:2px 0 10px 0;">'
-            f'{len(det_f)} apuestas · ✅ {n_gan} ganadas · ❌ {n_per} perdidas · '
-            f'beneficio <b style="color:rgb({color});">{ben:+.2f} u</b></p>',
+            f'<p class="rt-resumen">{len(det_f)} apuestas &nbsp;·&nbsp; ✅ <b>{n_gan}</b> ganadas '
+            f'&nbsp;·&nbsp; ❌ <b>{n_per}</b> perdidas &nbsp;·&nbsp; beneficio '
+            f'<b style="color:rgb({color});">{ben:+.2f} u</b></p>',
             unsafe_allow_html=True)
-        det_style = (det_f.style
-                     .map(_style_pl, subset=["Beneficio"])
-                     .map(_style_res, subset=["Resultado"])
-                     .format({"Cuota": "{:.2f}", "Stake %": "{:.2f}%", "Beneficio": "{:+.2f}", "Saldo": "{:.2f}"}))
-        st.dataframe(det_style, use_container_width=True, hide_index=True,
-                     height=table_height(len(det_f)))
+        # Tabla propia (HTML) para poder mostrar logos y el resultado como badge
+        tone = {"Ganado": "save", "Perdido": "fare", "Push": "warn"}
+        filas = ""
+        for _, r in det_f.iterrows():
+            pl = float(r["Beneficio"])
+            cls = "pos" if pl > 0 else ("neg" if pl < 0 else "zero")
+            filas += (
+                f'<tr><td class="fecha">{r["Fecha"]}</td>'
+                f'<td><span class="rt-game">{logos_for_matchup(r["Partido"])}'
+                f'<span class="nm">{r["Partido"]}</span></span></td>'
+                f'<td class="rt-sel">{r["Selección"]}</td>'
+                f'<td class="num">{r["Cuota"]:.2f}</td>'
+                f'<td class="num">{r["Stake %"]:.2f}%</td>'
+                f'<td>{badge(r["Resultado"], tone.get(r["Resultado"], "neutral"))}</td>'
+                f'<td class="num rt-pl {cls}">{pl:+.2f}</td>'
+                f'<td class="num">{float(r["Saldo"]):.2f}</td></tr>'
+            )
+        st.markdown(
+            '<div class="rt-wrap"><table class="rt-table"><thead><tr>'
+            '<th>Fecha</th><th>Partido</th><th>Selección</th><th class="num">Cuota</th>'
+            '<th class="num">Stake %</th><th>Resultado</th><th class="num">Beneficio</th>'
+            '<th class="num">Saldo</th></tr></thead><tbody>'
+            + filas + '</tbody></table></div>',
+            unsafe_allow_html=True)
     else:
         st.info("No hay apuestas en el periodo seleccionado.")
 
     st.download_button("⬇ Descargar detalle (CSV)", det_f.to_csv(index=False).encode("utf-8-sig"),
                        "bet_ia_detalle_picks.csv", "text/csv")
+    st.markdown('</div></div>', unsafe_allow_html=True)   # cierra tarjeta del detalle
 
     # ---- Respaldo del historial (clave en la nube: el disco es efímero) ----
     section_header("Respaldo del historial",
