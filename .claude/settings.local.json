@@ -44,7 +44,8 @@
       "Bash(git commit -q -m 'Arreglo: usar la linea REAL de totales en vez de asumir 8.5 *)",
       "Bash(git commit -q -m 'Dashboard: quitar la tabla de la jornada \\(ya vive en su propia pestana\\) *)",
       "Bash(git commit -q -m 'Parlay del dia + lineas de total reales \\(no promediadas\\) *)",
-      "Bash(git commit -q -m 'Parlay dinamico: BET IA elige cuantas patas, siempre sobre 50% *)"
+      "Bash(git commit -q -m 'Parlay dinamico: BET IA elige cuantas patas, siempre sobre 50% *)",
+      "Bash(git commit -q -m 'Compactar Chief Tipster y Parlay para alinear con Top Pick *)"
     ]
   }
 }

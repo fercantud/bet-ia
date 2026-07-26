@@ -78,7 +78,7 @@ svg{ display:inline-block; vertical-align:middle; }
 
 /* cards */
 .fh-card{ border:1px solid rgb(var(--line)); background:rgb(var(--surface)); border-radius:16px;
-    box-shadow:0 1px 2px rgb(16 24 40/.04),0 2px 8px rgb(16 24 40/.06); margin-bottom:26px; overflow:hidden; }
+    box-shadow:0 1px 2px rgb(16 24 40/.04),0 2px 8px rgb(16 24 40/.06); margin-bottom:18px; overflow:hidden; }
 .fh-card.hl{ border-top:3px solid rgb(var(--accent)); }
 .fh-card-header{ display:flex; align-items:center; justify-content:space-between; gap:10px;
     padding:11px 16px; border-bottom:1px solid rgb(var(--line)); }
@@ -211,9 +211,14 @@ svg{ display:inline-block; vertical-align:middle; }
 .tp-track{ flex:1; height:6px; border-radius:999px; background:rgb(var(--surface2)); overflow:hidden; }
 .tp-track i{ display:block; height:100%; border-radius:999px; }
 
+/* ---- Chief Tipster: rejilla compacta ---- */
+.ct-grid{ margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; }
+.ct-grid p{ margin:0 !important; font-size:11.5px !important; color:rgb(var(--ink2)); line-height:1.2 !important; }
+.ct-grid b{ font-size:13px; font-weight:700; color:rgb(var(--ink)); line-height:1.25; }
+
 /* ---- Parlay del dia (checklist) ---- */
-.pl-legs{ padding:6px 16px 0 16px; }
-.pl-leg{ display:flex; align-items:center; gap:10px; padding:9px 0;
+.pl-legs{ padding:4px 16px 0 16px; }
+.pl-leg{ display:flex; align-items:center; gap:10px; padding:5px 0;
     border-bottom:1px solid rgb(var(--line)); }
 .pl-leg:last-child{ border-bottom:none; }
 .pl-check{ width:20px; height:20px; border-radius:6px; flex-shrink:0; display:flex;
@@ -231,11 +236,11 @@ svg{ display:inline-block; vertical-align:middle; }
 .pl-odds{ font-size:12px; color:rgb(var(--ink2)); font-variant-numeric:tabular-nums; min-width:34px; text-align:right; }
 .pl-leg.lost .pl-txt b{ color:rgb(var(--fare)); text-decoration:line-through; }
 .pl-leg.won .pl-txt b{ color:rgb(var(--save)); }
-.pl-foot{ display:flex; gap:10px; padding:12px 16px; margin-top:4px;
+.pl-foot{ display:flex; gap:8px; padding:6px 16px; margin-top:0;
     border-top:1px solid rgb(var(--line)); background:rgb(var(--surface2)/0.5); }
-.pl-foot div{ flex:1; display:flex; flex-direction:column; gap:2px; }
-.pl-foot span{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:rgb(var(--ink2)); }
-.pl-foot b{ font-size:16px; font-weight:800; color:rgb(var(--ink)); font-variant-numeric:tabular-nums; }
+.pl-foot div{ flex:1; display:flex; flex-direction:column; gap:0; }
+.pl-foot span{ font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; color:rgb(var(--ink2)); line-height:1.3; }
+.pl-foot b{ font-size:14px; font-weight:800; color:rgb(var(--ink)); font-variant-numeric:tabular-nums; line-height:1.25; }
 .pl-foot b.pos{ color:rgb(var(--save)); } .pl-foot b.neg{ color:rgb(var(--fare)); }
 
 /* ---- Tabla unificada de la jornada (estilo Bloomberg/ESPN) ---- */
@@ -1269,13 +1274,13 @@ def render_dashboard():
         st.markdown(
             card_header("Chief Tipster Decision", "Director general del sistema multi-agente", "crown",
                         badge(status, st_tone))
-            + f'<p style="font-size:30px;font-weight:800;letter-spacing:-.02em;color:rgb(var(--ink));margin:0;">'
-            f'{len(approved_picks)} <span style="font-size:12px;font-weight:500;color:rgb(var(--ink2));">picks aprobados hoy</span></p>'
-            f'<div style="margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:16px 12px;font-size:13px;">'
-            f'<div><p style="margin:0;color:rgb(var(--ink2));">Mejor mercado</p><p style="margin:2px 0 0 0;font-weight:700;">{top_pick["market"]}</p></div>'
-            f'<div><p style="margin:0;color:rgb(var(--ink2));">ROI esperado</p><p style="margin:2px 0 0 0;font-weight:700;color:rgb(var(--save));">{roi}</p></div>'
-            f'<div><p style="margin:0;color:rgb(var(--ink2));">Win rate histórico</p><p style="margin:2px 0 0 0;font-weight:700;">{wr:.0f}%</p></div>'
-            f'<div><p style="margin:0;color:rgb(var(--ink2));">Riesgo global</p><p style="margin:2px 0 0 0;font-weight:700;color:rgb(var(--save));">Controlado</p></div>'
+            + f'<p style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:rgb(var(--ink));margin:0;line-height:1.1;">'
+            f'{len(approved_picks)} <span style="font-size:11.5px;font-weight:500;color:rgb(var(--ink2));">picks aprobados hoy</span></p>'
+            f'<div class="ct-grid">'
+            f'<div><p>Mejor mercado</p><b>{top_pick["market"]}</b></div>'
+            f'<div><p>ROI esperado</p><b style="color:rgb(var(--save));">{roi}</b></div>'
+            f'<div><p>Win rate histórico</p><b>{wr:.0f}%</b></div>'
+            f'<div><p>Riesgo global</p><b style="color:rgb(var(--save));">Controlado</b></div>'
             f'</div></div></div>',
             unsafe_allow_html=True,
         )
