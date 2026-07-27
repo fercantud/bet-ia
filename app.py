@@ -496,10 +496,11 @@ section[data-testid="stSidebar"] .st-key-liga_LMB .stButton > button{
     background-image:url("https://www.mlbstatic.com/team-logos/league-on-dark/125.svg") !important; }
 section[data-testid="stSidebar"] .st-key-liga_LMB .stButton > button[kind="primary"]{
     background-image:url("https://www.mlbstatic.com/team-logos/league-on-light/125.svg") !important; }
-/* KBO no tiene escudo en esa fuente: se deja el texto visible */
-section[data-testid="stSidebar"] .st-key-liga_KBO .stButton > button p,
-section[data-testid="stSidebar"] .st-key-liga_KBO .stButton > button div{
-    font-size:14px !important; line-height:1.2 !important; font-weight:800; }
+/* KBO no tiene escudo en mlbstatic (404): se usa uno generado */
+section[data-testid="stSidebar"] .st-key-liga_KBO .stButton > button{
+    background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjAgNDgiPjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iNDgiIHJ4PSIxMCIgZmlsbD0iIzFFMjkzQiIvPjx0ZXh0IHg9IjYwIiB5PSIyNCIgZmlsbD0iI0UyRThGMCIgZm9udC1mYW1pbHk9IkludGVyLEFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjYiIGZvbnQtd2VpZ2h0PSI4MDAiIGxldHRlci1zcGFjaW5nPSIxIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0iY2VudHJhbCI+S0JPPC90ZXh0Pjwvc3ZnPg==") !important; }
+section[data-testid="stSidebar"] .st-key-liga_KBO .stButton > button[kind="primary"]{
+    background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjAgNDgiPjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iNDgiIHJ4PSIxMCIgZmlsbD0iI0ZGRkZGRiIvPjx0ZXh0IHg9IjYwIiB5PSIyNCIgZmlsbD0iI0VGNDQ0NCIgZm9udC1mYW1pbHk9IkludGVyLEFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjYiIGZvbnQtd2VpZ2h0PSI4MDAiIGxldHRlci1zcGFjaW5nPSIxIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0iY2VudHJhbCI+S0JPPC90ZXh0Pjwvc3ZnPg==") !important; }
 
 /* topbar acciones */
 .fh-top-actions{ display:flex; align-items:center; gap:10px; }
@@ -691,7 +692,10 @@ def fmt_start(iso):
         return ""
 
 
-def team_logo(team_id):
+def team_logo(team_id, nombre=None):
+    """Escudo del equipo. Si la liga no tiene logos oficiales (id 0), se genera uno."""
+    if not team_id:
+        return f'<img class="fh-score-logo" src="{escudo_svg(nombre or "")}" alt=""/>'
     return f'<img class="fh-score-logo" src="https://www.mlbstatic.com/team-logos/{team_id}.svg" alt=""/>'
 
 
@@ -757,10 +761,10 @@ def scoreboard_html(g):
         diamond = '<span style="font-size:11px;color:rgb(var(--ink2));">Por comenzar</span>'
     return (
         f'<div class="fh-score {live_cls}"><div class="fh-score-main">'
-        f'<div class="fh-score-row">{team_logo(g["away_id"])}'
+        f'<div class="fh-score-row">{team_logo(g["away_id"], g["away_team"])}'
         f'<span class="fh-score-team {a_lose}">{g["away_team"]}</span>'
         f'<span class="fh-score-runs">{g["away_score"] if g["is_live"] or g["is_final"] else "-"}</span></div>'
-        f'<div class="fh-score-row">{team_logo(g["home_id"])}'
+        f'<div class="fh-score-row">{team_logo(g["home_id"], g["home_team"])}'
         f'<span class="fh-score-team {h_lose}">{g["home_team"]}</span>'
         f'<span class="fh-score-runs">{g["home_score"] if g["is_live"] or g["is_final"] else "-"}</span></div>'
         f'</div><div class="fh-score-side">'
@@ -1127,6 +1131,40 @@ def mlb_team_ids():
     return ids
 
 
+# Escudos propios para ligas cuyos logos no estan en mlbstatic (KBO).
+# Se dibujan como SVG embebido: sin dependencias externas ni enlaces rotos.
+_ESCUDOS = {
+    "Doosan Bears":   ("DOO", "#131230"),
+    "SSG Landers":    ("SSG", "#CE0E2D"),
+    "Lotte Giants":   ("LOT", "#041E42"),
+    "Hanwha Eagles":  ("HAN", "#FC4E00"),
+    "KT Wiz":         ("KT",  "#000000"),
+    "NC Dinos":       ("NC",  "#315288"),
+    "Kia Tigers":     ("KIA", "#EA0029"),
+    "Samsung Lions":  ("SS",  "#074CA1"),
+    "Kiwoom Heroes":  ("KIW", "#570514"),
+    "LG Twins":       ("LG",  "#C30452"),
+}
+
+
+def escudo_svg(nombre, size=22):
+    """Escudo generado: circulo con el color del equipo y sus iniciales."""
+    abbr, color = _ESCUDOS.get(nombre) or next(
+        ((a, c) for k, (a, c) in _ESCUDOS.items() if _team_match(k, nombre)), (None, None))
+    if not abbr:
+        palabras = [w for w in str(nombre).split() if w[:1].isalnum()]
+        abbr = ("".join(w[0] for w in palabras[:3]) or "?").upper()
+        color = "#64748B"
+    fuente = 30 if len(abbr) <= 2 else 22
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+           f'<circle cx="32" cy="32" r="30" fill="{color}"/>'
+           f'<text x="32" y="32" fill="#fff" font-family="Inter,Arial,sans-serif" '
+           f'font-size="{fuente}" font-weight="700" text-anchor="middle" '
+           f'dominant-baseline="central">{abbr}</text></svg>')
+    import base64
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
+
 def logos_for_matchup(matchup):
     """Los dos logos de un enfrentamiento 'Visitante @ Local'."""
     ids = mlb_team_ids()
@@ -1135,19 +1173,25 @@ def logos_for_matchup(matchup):
     for p in partes[:2]:
         p = p.strip()
         tid = ids.get(p) or next((v for k, v in ids.items() if _team_match(k, p)), None)
-        out += (f'<img src="https://www.mlbstatic.com/team-logos/{tid}.svg" alt=""/>'
-                if tid else '<span class="rt-nologo">⚾</span>')
+        src = (f"https://www.mlbstatic.com/team-logos/{tid}.svg"
+               if tid and not _sin_logo_oficial(p) else escudo_svg(p))
+        out += f'<img src="{src}" alt=""/>'
     return out
+
+
+def _sin_logo_oficial(nombre):
+    """Equipos cuyo escudo no existe en mlbstatic (se usa el generado)."""
+    return any(_team_match(k, nombre) for k in _ESCUDOS)
 
 
 def logo_for_team(name, games):
     """Devuelve el <img> del logo del equipo buscándolo en los partidos de la jornada."""
     for g in games:
-        if _team_match(g["away_team"], name):
-            return team_logo(g["away_id"])
-        if _team_match(g["home_team"], name):
-            return team_logo(g["home_id"])
-    return '<span style="width:22px;height:22px;display:inline-block;text-align:center;">⚾</span>'
+        if _team_match(g["away_team"], name) and g["away_id"]:
+            return team_logo(g["away_id"], g["away_team"])
+        if _team_match(g["home_team"], name) and g["home_id"]:
+            return team_logo(g["home_id"], g["home_team"])
+    return f'<img class="fh-score-logo" src="{escudo_svg(name)}" alt=""/>'
 
 
 def opponent_of(matchup, selection):
@@ -1373,9 +1417,9 @@ def match_table_row(r):
         f'<tr class="{r["estado"]}{res_cls}">'
         f'<td class="c-hora">{r["hora"]}</td>'
         f'<td class="c-est">{estado_badge}</td>'
-        f'<td class="c-part"><span class="teams">{team_logo(g["away_id"])}'
+        f'<td class="c-part"><span class="teams">{team_logo(g["away_id"], g["away_team"])}'
         f'<span class="t">{g["away_team"]}</span>'
-        f'<span class="vs">vs</span>{team_logo(g["home_id"])}'
+        f'<span class="vs">vs</span>{team_logo(g["home_id"], g["home_team"])}'
         f'<span class="t">{g["home_team"]}</span></span></td>'
         f'<td>{pick_td}</td>'
         f'<td class="num">{prob_td}</td>'

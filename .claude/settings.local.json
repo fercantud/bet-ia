@@ -64,7 +64,8 @@
       "Bash(powershell -Command ' *)",
       "Bash(git commit -q -m 'Cerrar la tabla de Jornada con borde, igual que la de Resultados *)",
       "Bash(git commit -q -m 'Agregar KBO \\(liga coreana\\) como tercera liga *)",
-      "Bash(git commit -q -m 'KBO: adelantar la jornada un dia *)"
+      "Bash(git commit -q -m 'KBO: adelantar la jornada un dia *)",
+      "Bash(git commit -q -m 'Escudos para KBO: equipos y logo de liga *)"
     ]
   }
 }
