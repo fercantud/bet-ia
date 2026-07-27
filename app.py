@@ -705,7 +705,9 @@ board_df = pd.DataFrame([{
 # reinicios y no depende de una base de datos. El núcleo analítico no se toca.
 # ---------------------------------------------------------------------------
 def _read_history_file():
-    """Lee el historial del JSON. Si no existe, intenta migrar desde la BD antigua."""
+    """Lee el historial de la liga activa. Si no existe el archivo y la liga es
+    MLB, migra la BD antigua (que solo contiene datos de MLB). Para el resto de
+    ligas se empieza vacio: migrar ahi mezclaria partidos de otra liga."""
     if os.path.exists(HISTORY_FILE):
         try:
             with open(HISTORY_FILE, encoding="utf-8") as f:
@@ -713,6 +715,8 @@ def _read_history_file():
             return data.get("bets", []) if isinstance(data, dict) else data
         except Exception:
             return []
+    if st.session_state.get("liga", "MLB") != "MLB":
+        return []
     return _migrate_from_sqlite()
 
 
@@ -944,12 +948,22 @@ LIVE_COUNT = len([g for g in fetch_live_scores() if g["is_live"]])
 
 @st.cache_data(ttl=86400)
 def mlb_team_ids():
-    """Mapa nombre de equipo -> id, para poder mostrar logos de cualquier fecha."""
-    try:
-        r = requests.get("https://statsapi.mlb.com/api/v1/teams?sportId=1", timeout=8).json()
-        return {t["name"]: t["id"] for t in r.get("teams", [])}
-    except Exception:
-        return {}
+    """Mapa nombre de equipo -> id para los logos. Incluye todas las ligas
+    configuradas (MLB y LMB), asi los escudos salen en ambas."""
+    ids = {}
+    urls = ["https://statsapi.mlb.com/api/v1/teams?sportId=1"]
+    for cfg in LIGAS.values():
+        if cfg["sport_id"] == 1:
+            continue
+        liga = f"&leagueId={cfg['league_id']}" if cfg["league_id"] else ""
+        urls.append(f"https://statsapi.mlb.com/api/v1/teams?sportId={cfg['sport_id']}{liga}")
+    for u in urls:
+        try:
+            r = requests.get(u, timeout=8).json()
+            ids.update({t["name"]: t["id"] for t in r.get("teams", [])})
+        except Exception:
+            pass
+    return ids
 
 
 def logos_for_matchup(matchup):

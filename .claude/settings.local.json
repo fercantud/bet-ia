@@ -59,7 +59,8 @@
       "Bash(git commit -q -m 'Fondo de pagina blanco en lugar de gris claro *)",
       "Bash(git commit -q -m 'Bankroll de $10,000 pesos desde el dia 1 *)",
       "Bash(git commit -q -m 'Barra lateral: marca pegada arriba y navegacion alineada a la izquierda *)",
-      "Bash(git commit -q -m 'Agregar LMB \\(Liga Mexicana de Beisbol\\) como liga aparte *)"
+      "Bash(git commit -q -m 'Agregar LMB \\(Liga Mexicana de Beisbol\\) como liga aparte *)",
+      "Bash(git commit -q -m 'Corregir historial de LMB contaminado con partidos de MLB *)"
     ]
   }
 }
