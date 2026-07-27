@@ -39,6 +39,7 @@ LIGAS = {
         "historial": "historial_apuestas.json",
         "analisis": "analisis_hoy.json",
         "cuotas_reales": True,
+        "logo_id": 1,                          # logo de liga en mlbstatic
     },
     "LMB": {
         "nombre": "LMB",
@@ -46,6 +47,7 @@ LIGAS = {
         "historial": "historial_apuestas_lmb.json",
         "analisis": "analisis_hoy_lmb.json",
         "cuotas_reales": False,                # sin mercado publicado: cuotas estimadas
+        "logo_id": 125,
     },
 }
 if "liga" not in st.session_state:
@@ -441,10 +443,24 @@ section[data-testid="stSidebar"] [data-testid="stSidebarHeader"]{
 .sb-lbl{ font-size:10.5px !important; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
     color:rgb(var(--dkink2)); margin:0 0 6px 0 !important; }
 .sb-sep{ border-bottom:1px solid rgb(var(--dkline)); margin:14px 0; }
-/* los botones de liga van centrados, a diferencia del menu */
-section[data-testid="stSidebar"] [class*="stColumn"] .stButton > button,
-section[data-testid="stSidebar"] [class*="stColumn"] .stButton > button > div{
-    justify-content:center !important; text-align:center !important; font-size:13px; padding:7px 8px; }
+/* Botones de liga: se oculta el texto y se muestra el logo de la liga */
+section[data-testid="stSidebar"] [class*="stColumn"] .stButton > button{
+    height:54px; padding:6px !important; justify-content:center !important; }
+/* el atajo background del boton resetea estas propiedades: se fuerzan */
+section[data-testid="stSidebar"] [class*="st-key-liga"] .stButton > button{
+    background-repeat:no-repeat !important; background-position:center !important;
+    background-size:auto 28px !important; }
+section[data-testid="stSidebar"] [class*="stColumn"] .stButton > button p,
+section[data-testid="stSidebar"] [class*="stColumn"] .stButton > button div{
+    font-size:0 !important; line-height:0 !important; }
+section[data-testid="stSidebar"] .st-key-liga_MLB .stButton > button{
+    background-image:url("https://www.mlbstatic.com/team-logos/league-on-dark/1.svg") !important; }
+section[data-testid="stSidebar"] .st-key-liga_MLB .stButton > button[kind="primary"]{
+    background-image:url("https://www.mlbstatic.com/team-logos/league-on-light/1.svg") !important; }
+section[data-testid="stSidebar"] .st-key-liga_LMB .stButton > button{
+    background-image:url("https://www.mlbstatic.com/team-logos/league-on-dark/125.svg") !important; }
+section[data-testid="stSidebar"] .st-key-liga_LMB .stButton > button[kind="primary"]{
+    background-image:url("https://www.mlbstatic.com/team-logos/league-on-light/125.svg") !important; }
 
 section[data-testid="stSidebar"] .stButton > button{ border-radius:10px; font-weight:600; font-size:14.5px;
     padding:10px 14px; justify-content:flex-start !important; text-align:left !important; }
