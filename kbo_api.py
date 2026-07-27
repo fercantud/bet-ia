@@ -45,8 +45,11 @@ def _a_local(iso: str) -> str:
 class KBODataFetcher:
     """Agenda y marcadores de la KBO vía The Odds API."""
 
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str = None, fecha: str = None):
+        # `fecha` fija la jornada a consultar. La app le pasa la fecha con el
+        # desfase de la liga (Corea juega de madrugada en hora Central).
         self.api_key = api_key or os.getenv("ODDS_API_KEY", "")
+        self.fecha = fecha
 
     def _scores(self, days_from: int = 3) -> list:
         """Consulta cruda. Incluye partidos recientes y próximos."""
@@ -61,7 +64,7 @@ class KBODataFetcher:
             return []
 
     def get_todays_games(self, date: str = None) -> list:
-        dia = date or _hoy()
+        dia = date or self.fecha or _hoy()
         salida = []
         for g in self._scores():
             if _a_local(g.get("commence_time")) != dia:
@@ -78,7 +81,7 @@ class KBODataFetcher:
         return salida
 
     def get_live_scores(self, date: str = None) -> list:
-        dia = date or _hoy()
+        dia = date or self.fecha or _hoy()
         salida = []
         for g in self._scores():
             if _a_local(g.get("commence_time")) != dia:

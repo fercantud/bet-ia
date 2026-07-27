@@ -64,6 +64,9 @@ LIGAS = {
         "cuotas_reales": True,
         "odds_sport": "baseball_kbo",
         "logo_id": None,                       # sin escudos en esta fuente
+        # Corea juega de madrugada en hora Central: la jornada util es la del
+        # dia siguiente. Con esto, el 27 se muestran los partidos del 28.
+        "offset_dias": 1,
     },
 }
 if "liga" not in st.session_state:
@@ -74,11 +77,18 @@ HISTORY_FILE = LIGA["historial"]
 ANALYSIS_CACHE = LIGA["analisis"]
 
 
+def fecha_jornada(clave=None):
+    """Fecha de la jornada de la liga. Normalmente es hoy, pero una liga puede
+    declarar un desfase (KBO juega de madrugada: su jornada es la de mañana)."""
+    cfg = LIGAS[clave or st.session_state.liga]
+    return (now_local() + timedelta(days=cfg.get("offset_dias", 0))).strftime("%Y-%m-%d")
+
+
 def _crear_fetcher(clave):
     cfg = LIGAS[clave]
     if cfg.get("fuente") == "odds":
         from kbo_api import KBODataFetcher
-        return KBODataFetcher()
+        return KBODataFetcher(fecha=fecha_jornada(clave))
     return MLBDataFetcher(sport_id=cfg["sport_id"], league_id=cfg["league_id"])
 
 
@@ -788,7 +798,7 @@ def _analisis_es_de_hoy(bets):
 
 
 def get_todays_analysis():
-    today = now_local().strftime("%Y-%m-%d")
+    today = fecha_jornada()
     if os.path.exists(ANALYSIS_CACHE):
         try:
             with open(ANALYSIS_CACHE, encoding="utf-8") as f:
@@ -898,7 +908,7 @@ def sync_today_picks():
     si hoy ya se registraron no se duplican, y las jornadas anteriores se conservan
     (nunca se borran). Los picks NO BET (stake 0%) se guardan con beneficio 0."""
     bets = _read_history_file()
-    today = now_local().strftime("%Y-%m-%d")
+    today = fecha_jornada()
     existing_today = {(b["matchup"], b["selection"]) for b in bets
                       if str(b.get("date", "")).startswith(today)}
     next_id = max([int(b.get("id", 0)) for b in bets], default=0) + 1
@@ -1024,7 +1034,7 @@ def auto_settle_db(games):
     Consulta los resultados de LA FECHA de cada pick: los de jornadas anteriores
     ya no aparecen en la agenda de hoy, por eso se piden por separado."""
     bets = _read_history_file()
-    hoy = now_local().strftime("%Y-%m-%d")
+    hoy = fecha_jornada()
     changed = False
     por_fecha = {}   # cache local: fecha -> partidos de ese dia
 
@@ -1792,7 +1802,7 @@ def render_resultados():
 
     # ---- Filtro de periodo (Hoy · Ayer · Semana · Mes · Calendario) ----
     det["_dia"] = pd.to_datetime(en["date"].astype(str).str[:10], errors="coerce").dt.date
-    hoy = now_local().date()
+    hoy = pd.to_datetime(fecha_jornada()).date()   # respeta el desfase de la liga
 
     # Si se hizo clic en una fila del resumen, ese dia manda sobre el filtro
     if dia_click:
