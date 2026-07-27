@@ -49,7 +49,7 @@ st.markdown('''
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 :root{
-    --bg:245 247 250; --surface:255 255 255; --surface2:241 245 249;
+    --bg:255 255 255; --surface:255 255 255; --surface2:244 246 250;
     --ink:17 24 39; --ink2:107 114 128; --line:229 231 235;
     --accent:239 68 68; --accentink:255 255 255; --purple:139 92 246;
     --save:34 197 94; --warn:245 158 11; --fare:239 68 68; --blue:59 130 246;
