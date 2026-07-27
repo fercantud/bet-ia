@@ -1,12 +1,29 @@
+from datetime import datetime
+
 import requests
+
+# Zona horaria de la app. Sin esto se usaria el "hoy" que decida la API, que
+# puede ir un dia atras del reloj local: entonces se analizarian partidos ya
+# jugados y los picks del dia nacerian finalizados.
+try:
+    from zoneinfo import ZoneInfo
+    _TZ = ZoneInfo("America/Chicago")
+except Exception:
+    _TZ = None
+
+
+def _hoy() -> str:
+    return (datetime.now(_TZ) if _TZ else datetime.now()).strftime("%Y-%m-%d")
+
 
 class MLBDataFetcher:
     BASE_URL = "https://statsapi.mlb.com/api/v1"
 
-    def get_todays_games(self) -> list:
-        """Obtiene la jornada del día directamente desde MLB Stats API."""
+    def get_todays_games(self, date: str = None) -> list:
+        """Jornada del día desde MLB Stats API (fecha explícita, no la de la API)."""
         try:
-            url = f"{self.BASE_URL}/schedule?sportId=1&hydrate=probablePitcher"
+            url = (f"{self.BASE_URL}/schedule?sportId=1&date={date or _hoy()}"
+                   f"&hydrate=probablePitcher")
             response = requests.get(url, timeout=5).json()
             dates = response.get('dates', [])
             if not dates:
@@ -38,7 +55,7 @@ class MLBDataFetcher:
         Si se pasa `date` (YYYY-MM-DD) devuelve los partidos de ESE día; si no, los de hoy.
         Necesario para cerrar picks de jornadas anteriores."""
         try:
-            fecha = f"&date={date}" if date else ""
+            fecha = f"&date={date or _hoy()}"
             url = f"{self.BASE_URL}/schedule?sportId=1{fecha}&hydrate=linescore,team,probablePitcher"
             response = requests.get(url, timeout=6).json()
             dates = response.get('dates', [])

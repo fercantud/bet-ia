@@ -50,7 +50,12 @@
       "Bash(git commit -q -m 'Resultados: al hacer clic en un dia del resumen se filtra el detalle *)",
       "Bash(git commit -q -m 'Rediseno de la pestana Resultados *)",
       "Bash(git commit -q -m 'Diseno plano: quitar las cajas que envolvian las tablas *)",
-      "Bash(git commit -q -m 'Predicciones: quitar filtros y mover el parlay al final *)"
+      "Bash(git commit -q -m 'Predicciones: quitar filtros y mover el parlay al final *)",
+      "Bash(venv/Scripts/python.exe -m pytest test_fecha_jornada.py -q)",
+      "Bash(venv/Scripts/python.exe -m pytest test_fecha_jornada.py::test_la_jornada_pedida_es_la_correcta -q)",
+      "Bash(venv/Scripts/python.exe -m pytest test_fecha_jornada.py -q -p no:cacheprovider)",
+      "Bash(rm -f historial_antes_fix.json)",
+      "Bash(git commit -q -m 'Arreglo: pedir la jornada por fecha explicita a la MLB API *)"
     ]
   }
 }

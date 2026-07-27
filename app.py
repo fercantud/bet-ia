@@ -567,6 +567,29 @@ def scoreboard_html(g):
 # reutilizan esos mismos picks: NO se vuelve a analizar ni cambian los resultados.
 # Solo se recalcula cuando cambia la fecha (nueva jornada).
 # ---------------------------------------------------------------------------
+def _analisis_es_de_hoy(bets):
+    """True si los picks corresponden a los partidos programados para hoy.
+    Detecta el caso en que la API entrega una jornada distinta a la esperada."""
+    if not bets:
+        return True
+    try:
+        juegos = MLBDataFetcher().get_live_scores()      # ya usa la fecha local
+    except Exception:
+        return True                                      # sin datos, no bloquear
+    if not juegos:
+        return True
+    def _en(nombre, texto):                              # sin depender de helpers posteriores
+        a, b2 = str(nombre).strip().lower(), str(texto).strip().lower()
+        return a in b2 or b2 in a
+
+    coinciden = sum(
+        1 for b in bets
+        if any(_en(g["away_team"], b["matchup"]) and _en(g["home_team"], b["matchup"])
+               for g in juegos)
+    )
+    return coinciden >= max(1, len(bets) // 2)           # al menos la mitad
+
+
 def get_todays_analysis():
     today = now_local().strftime("%Y-%m-%d")
     if os.path.exists(ANALYSIS_CACHE):
@@ -587,6 +610,18 @@ def get_todays_analysis():
     except Exception:
         pass
     bets = get_analyzed_bets()  # se corre una única vez por día
+
+    # SALVAGUARDA: verifica que los picks correspondan a los partidos de HOY.
+    # Si la fuente de datos devolviera otra jornada (por ejemplo la de ayer, ya
+    # jugada), los picks nacerian finalizados. En ese caso no se guardan.
+    if not _analisis_es_de_hoy(bets):
+        st.error(
+            f"⚠️ El análisis no corresponde a la jornada del {today}: los partidos "
+            "recibidos son de otra fecha. No se guardaron picks para evitar "
+            "registrar resultados falsos. Vuelve a intentar en unos minutos."
+        )
+        return []
+
     try:
         with open(ANALYSIS_CACHE, "w", encoding="utf-8") as f:
             json.dump({"day": today, "bets": bets}, f, ensure_ascii=False)
