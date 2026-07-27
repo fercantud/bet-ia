@@ -17,13 +17,25 @@ def _hoy() -> str:
 
 
 class MLBDataFetcher:
+    """Lector de la MLB Stats API. Por defecto trae MLB (sportId=1); con otros
+    parametros sirve para ligas como la LMB (sportId=23, leagueId=125), que viven
+    en la misma API. El comportamiento por defecto NO cambia."""
+
     BASE_URL = "https://statsapi.mlb.com/api/v1"
+
+    def __init__(self, sport_id: int = 1, league_id: int = None):
+        self.sport_id = sport_id
+        self.league_id = league_id
+
+    @property
+    def _liga(self) -> str:
+        return f"&leagueId={self.league_id}" if self.league_id else ""
 
     def get_todays_games(self, date: str = None) -> list:
         """Jornada del día desde MLB Stats API (fecha explícita, no la de la API)."""
         try:
-            url = (f"{self.BASE_URL}/schedule?sportId=1&date={date or _hoy()}"
-                   f"&hydrate=probablePitcher")
+            url = (f"{self.BASE_URL}/schedule?sportId={self.sport_id}{self._liga}"
+                   f"&date={date or _hoy()}&hydrate=probablePitcher")
             response = requests.get(url, timeout=5).json()
             dates = response.get('dates', [])
             if not dates:
@@ -56,7 +68,8 @@ class MLBDataFetcher:
         Necesario para cerrar picks de jornadas anteriores."""
         try:
             fecha = f"&date={date or _hoy()}"
-            url = f"{self.BASE_URL}/schedule?sportId=1{fecha}&hydrate=linescore,team,probablePitcher"
+            url = (f"{self.BASE_URL}/schedule?sportId={self.sport_id}{self._liga}{fecha}"
+                   f"&hydrate=linescore,team,probablePitcher")
             response = requests.get(url, timeout=6).json()
             dates = response.get('dates', [])
             if not dates:

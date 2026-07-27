@@ -68,7 +68,7 @@ def _market_lean(game_id, market):
     return (key % 90) / 1000.0 - 0.035
 
 
-def _build_bets_from_real_games():
+def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True):
     """CONEXIÓN A DATOS REALES (Camino 2).
 
     Toma la agenda REAL de la MLB del día y calcula cada pick con las MISMAS
@@ -90,7 +90,9 @@ def _build_bets_from_real_games():
     except Exception:
         return []
 
-    fetcher = MLBDataFetcher()
+    # `fetcher` permite analizar otra liga (p. ej. LMB) con las MISMAS formulas.
+    # Sin argumentos se comporta exactamente igual que antes: MLB.
+    fetcher = fetcher or MLBDataFetcher()
     try:
         games = fetcher.get_todays_games()
     except Exception:
@@ -103,7 +105,8 @@ def _build_bets_from_real_games():
     weather_agent = WeatherAgent()
     offense_agent = OffenseAgent()
     try:
-        real_odds = OddsDataFetcher().get_moneyline_odds()  # {} si no hay API key
+        # Ligas sin mercado publicado (LMB) van con cuotas estimadas.
+        real_odds = OddsDataFetcher().get_moneyline_odds() if con_cuotas_reales else {}
     except Exception:
         real_odds = {}
 
@@ -248,16 +251,18 @@ def _build_bets_from_real_games():
     return bets
 
 
-def get_analyzed_bets():
+def get_analyzed_bets(fetcher=None, con_cuotas_reales=True, con_demo=True):
     """Genera y ordena los picks del motor multi-agente.
 
     Fuente de datos: agenda REAL de la MLB del día (vía _build_bets_from_real_games).
     Si no hay conexión, usa el set de ejemplo fijo (_demo_bets). La lógica de
     ordenamiento, stake, tag y aprobación del Chief Tipster NO cambia.
     """
-    raw_bets = _build_bets_from_real_games()
-    if not raw_bets:
+    raw_bets = _build_bets_from_real_games(fetcher, con_cuotas_reales)
+    if not raw_bets and con_demo:
         raw_bets = _demo_bets()
+    if not raw_bets:
+        return []
 
     # Ordenamiento estricto por: 1) EV positivo, 2) Mayor Score, 3) Mayor Confianza
     sorted_bets = sorted(raw_bets, key=lambda x: (x['ev'] > 0, x['ev'], x['score'], x['confidence']), reverse=True)

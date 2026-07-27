@@ -27,9 +27,37 @@ from main import get_analyzed_bets
 from mlb_api import MLBDataFetcher
 
 DB_NAME = "bet_ia_performance.db"          # BD antigua (solo para migrar una vez)
-HISTORY_FILE = "historial_apuestas.json"   # historial persistente (portable/respaldable)
-ANALYSIS_CACHE = "analisis_hoy.json"
-VERSION = "2.5.0"
+VERSION = "2.6.0"
+
+# --- Ligas disponibles -------------------------------------------------------
+# MLB conserva EXACTAMENTE sus archivos y su fuente de datos. LMB se agrega
+# aparte, con su propio historial y su propio analisis; comparten el motor.
+LIGAS = {
+    "MLB": {
+        "nombre": "MLB",
+        "sport_id": 1, "league_id": None,
+        "historial": "historial_apuestas.json",
+        "analisis": "analisis_hoy.json",
+        "cuotas_reales": True,
+    },
+    "LMB": {
+        "nombre": "LMB",
+        "sport_id": 23, "league_id": 125,      # Liga Mexicana de Beisbol
+        "historial": "historial_apuestas_lmb.json",
+        "analisis": "analisis_hoy_lmb.json",
+        "cuotas_reales": False,                # sin mercado publicado: cuotas estimadas
+    },
+}
+if "liga" not in st.session_state:
+    st.session_state.liga = "MLB"
+LIGA = LIGAS[st.session_state.liga]
+
+HISTORY_FILE = LIGA["historial"]
+ANALYSIS_CACHE = LIGA["analisis"]
+
+
+def fetcher_liga():
+    return MLBDataFetcher(sport_id=LIGA["sport_id"], league_id=LIGA["league_id"])
 
 # En Streamlit Cloud la API key de The Odds API se guarda en "Secrets" (no en el código).
 # Aquí la pasamos a variable de entorno para que odds_api.py la lea. En local esto se ignora.
@@ -389,6 +417,13 @@ section[data-testid="stSidebar"] [data-testid="stSidebarHeader"]{
 .sb-name{ font-size:19px; font-weight:800; margin:0 !important; letter-spacing:-.02em;
     color:#f8fafc; line-height:1.15; }
 .sb-tag{ font-size:12px !important; margin:1px 0 0 0 !important; color:rgb(var(--dkink2)); line-height:1.2; }
+.sb-lbl{ font-size:10.5px !important; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+    color:rgb(var(--dkink2)); margin:0 0 6px 0 !important; }
+.sb-sep{ border-bottom:1px solid rgb(var(--dkline)); margin:14px 0; }
+/* los botones de liga van centrados, a diferencia del menu */
+section[data-testid="stSidebar"] [class*="stColumn"] .stButton > button,
+section[data-testid="stSidebar"] [class*="stColumn"] .stButton > button > div{
+    justify-content:center !important; text-align:center !important; font-size:13px; padding:7px 8px; }
 
 section[data-testid="stSidebar"] .stButton > button{ border-radius:10px; font-weight:600; font-size:14.5px;
     padding:10px 14px; justify-content:flex-start !important; text-align:left !important; }
@@ -592,7 +627,7 @@ def _analisis_es_de_hoy(bets):
     if not bets:
         return True
     try:
-        juegos = MLBDataFetcher().get_live_scores()      # ya usa la fecha local
+        juegos = fetcher_liga().get_live_scores()        # ya usa la fecha local
     except Exception:
         return True                                      # sin datos, no bloquear
     if not juegos:
@@ -628,7 +663,9 @@ def get_todays_analysis():
         _np.random.seed(int(today.replace("-", "")))
     except Exception:
         pass
-    bets = get_analyzed_bets()  # se corre una única vez por día
+    bets = get_analyzed_bets(fetcher_liga(),
+                             con_cuotas_reales=LIGA["cuotas_reales"],
+                             con_demo=(st.session_state.liga == "MLB"))
 
     # SALVAGUARDA: verifica que los picks correspondan a los partidos de HOY.
     # Si la fuente de datos devolviera otra jornada (por ejemplo la de ayer, ya
@@ -651,7 +688,7 @@ def get_todays_analysis():
 
 sorted_bets = get_todays_analysis()
 approved_picks = [b for b in sorted_bets if b["approved"]]
-top_pick = sorted_bets[0]
+top_pick = sorted_bets[0] if sorted_bets else None
 
 board_df = pd.DataFrame([{
     "RANK": b["rank"], "PARTIDO": b["matchup"], "MERCADO": b["market"],
@@ -825,9 +862,13 @@ def settle_pick(matchup, selection, market, games):
 
 
 @st.cache_data(ttl=900)
+def _scores_date(dia, sport_id, league_id):
+    return MLBDataFetcher(sport_id=sport_id, league_id=league_id).get_live_scores(date=dia)
+
+
 def scores_for_date(dia):
     """Resultados de una fecha concreta (para cerrar picks de dias anteriores)."""
-    return MLBDataFetcher().get_live_scores(date=dia)
+    return _scores_date(dia, LIGA["sport_id"], LIGA["league_id"])
 
 
 def auto_settle_db(games):
@@ -876,8 +917,12 @@ def enrich_history(df, bankroll):
 
 
 @st.cache_data(ttl=60)
+def _live_scores(sport_id, league_id):
+    return MLBDataFetcher(sport_id=sport_id, league_id=league_id).get_live_scores()
+
+
 def fetch_live_scores():
-    return MLBDataFetcher().get_live_scores()
+    return _live_scores(LIGA["sport_id"], LIGA["league_id"])
 
 
 BANKROLL_INICIAL = 10000.0     # pesos, desde el dia 1
@@ -1187,6 +1232,17 @@ with st.sidebar:
         '<p class="sb-tag">Radar multideporte · Quant</p></div></div>',
         unsafe_allow_html=True,
     )
+
+    # --- Selector de liga ---
+    st.markdown('<p class="sb-lbl">Liga</p>', unsafe_allow_html=True)
+    cols = st.columns(len(LIGAS))
+    for col, (clave, cfg) in zip(cols, LIGAS.items()):
+        activa = st.session_state.liga == clave
+        if col.button(cfg["nombre"], key=f"liga_{clave}", use_container_width=True,
+                      type="primary" if activa else "secondary"):
+            st.session_state.liga = clave
+            st.rerun()
+    st.markdown('<div class="sb-sep"></div>', unsafe_allow_html=True)
     for micon, _, label in PAGES:
         active = st.session_state.page == label
         if st.button(f":material/{micon}: {label}", key=f"nav_{label}", use_container_width=True,
@@ -1750,6 +1806,11 @@ def render_rendimiento():
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
+def _sin_jornada():
+    st.info(f"Hoy no hay jornada publicada para **{LIGA['nombre']}**. "
+            "Cambia de liga en la barra lateral o vuelve más tarde.")
+
+
 ROUTES = {
     "Dashboard": render_dashboard,
     "Jornada de hoy": render_jornada,
@@ -1758,4 +1819,7 @@ ROUTES = {
     "Resultados": render_resultados,
     "Rendimiento": render_rendimiento,
 }
-ROUTES.get(st.session_state.page, render_dashboard)()
+if not sorted_bets:
+    _sin_jornada()
+else:
+    ROUTES.get(st.session_state.page, render_dashboard)()
