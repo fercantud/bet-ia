@@ -376,8 +376,27 @@ div[role="radiogroup"] > label:has(input:checked) div, div[role="radiogroup"] > 
 
 /* widget overrides */
 div[data-testid="stMetric"]{ display:none; }
-section[data-testid="stSidebar"] .stButton > button{ border-radius:10px; font-weight:600; font-size:14px;
-    padding:9px 14px; justify-content:flex-start; }
+/* --- Barra lateral: marca pegada arriba y navegacion a la izquierda --- */
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{ padding-top:0 !important; }
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{ padding-top:0 !important; }
+/* La cabecera del sidebar (boton de colapsar) reservaba 60px de aire */
+section[data-testid="stSidebar"] [data-testid="stSidebarHeader"]{
+    height:auto !important; min-height:0 !important; padding:6px 0 0 0 !important; }
+.sb-brand{ display:flex; align-items:center; gap:12px; padding:0 0 18px 0;
+    border-bottom:1px solid rgb(var(--dkline)); margin-bottom:14px; }
+.sb-logo{ width:42px; height:42px; border-radius:12px; background:rgb(var(--accent));
+    color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.sb-name{ font-size:19px; font-weight:800; margin:0 !important; letter-spacing:-.02em;
+    color:#f8fafc; line-height:1.15; }
+.sb-tag{ font-size:12px !important; margin:1px 0 0 0 !important; color:rgb(var(--dkink2)); line-height:1.2; }
+
+section[data-testid="stSidebar"] .stButton > button{ border-radius:10px; font-weight:600; font-size:14.5px;
+    padding:10px 14px; justify-content:flex-start !important; text-align:left !important; }
+/* Streamlit centra el contenido interno del boton: se fuerza a la izquierda */
+section[data-testid="stSidebar"] .stButton > button > div,
+section[data-testid="stSidebar"] .stButton > button p{
+    justify-content:flex-start !important; text-align:left !important; width:100%; }
+section[data-testid="stSidebar"] .stButton{ margin-bottom:3px; }
 section[data-testid="stSidebar"] .stButton > button[kind="secondary"]{ background:transparent;
     color:rgb(var(--dkink2)); border:1px solid transparent; }
 section[data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover{ background:rgb(var(--dk2)); color:#f1f5f9; }
@@ -1153,7 +1172,7 @@ PAGES = [
     ("space_dashboard", "grid", "Dashboard"),
     ("today", "calendar", "Jornada de hoy"),
     ("track_changes", "target", "Predicciones"),
-    ("sensors", "sensors", "En Vivo"),
+    ("sensors", "sensors", "En vivo"),
     ("receipt_long", "receipt", "Resultados"),
     ("leaderboard", "trophy", "Rendimiento"),
 ]
@@ -1162,12 +1181,10 @@ if "page" not in st.session_state:
 
 with st.sidebar:
     st.markdown(
-        '<div style="display:flex;align-items:center;gap:11px;padding:2px 0 16px 0;'
-        'border-bottom:1px solid rgb(var(--line));margin-bottom:14px;">'
-        '<div class="fh-top-ico" style="width:38px;height:38px;">'
-        + svg("bar", 20) + '</div><div>'
-        '<p style="font-size:16px;font-weight:800;margin:0;letter-spacing:-.01em;">BET IA</p>'
-        '<p class="fh-subtitle" style="margin-top:0;">MLB Radar · Quant</p></div></div>',
+        '<div class="sb-brand">'
+        '<div class="sb-logo">' + svg("bar", 22) + '</div>'
+        '<div><p class="sb-name">BET IA</p>'
+        '<p class="sb-tag">Radar multideporte · Quant</p></div></div>',
         unsafe_allow_html=True,
     )
     for micon, _, label in PAGES:
@@ -1332,7 +1349,7 @@ def render_dashboard():
         st.session_state.page = "Predicciones"
         st.rerun()
     if bcol2.button("Ver todos los partidos", key="see_games", type="secondary", use_container_width=True):
-        st.session_state.page = "En Vivo"
+        st.session_state.page = "En vivo"
         st.rerun()
 
 
@@ -1374,7 +1391,7 @@ def render_predicciones():
 # ---------------------------------------------------------------------------
 def render_en_vivo():
     """Marcadores en vivo (movidos aqui desde el Dashboard)."""
-    topbar("En Vivo", "Marcadores en tiempo real · MLB Stats API", "sensors")
+    topbar("En vivo", "Marcadores en tiempo real · MLB Stats API", "sensors")
 
     a, b = st.columns([1, 5])
     if a.button("🔄 Actualizar", type="primary", use_container_width=True):
@@ -1737,7 +1754,7 @@ ROUTES = {
     "Dashboard": render_dashboard,
     "Jornada de hoy": render_jornada,
     "Predicciones": render_predicciones,
-    "En Vivo": render_en_vivo,
+    "En vivo": render_en_vivo,
     "Resultados": render_resultados,
     "Rendimiento": render_rendimiento,
 }
