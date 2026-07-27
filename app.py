@@ -35,7 +35,9 @@ VERSION = "2.6.0"
 LIGAS = {
     "MLB": {
         "nombre": "MLB",
+        "fuente": "mlb",
         "sport_id": 1, "league_id": None,
+        "odds_sport": "baseball_mlb",
         "historial": "historial_apuestas.json",
         "analisis": "analisis_hoy.json",
         "cuotas_reales": True,
@@ -43,11 +45,25 @@ LIGAS = {
     },
     "LMB": {
         "nombre": "LMB",
+        "fuente": "mlb",
         "sport_id": 23, "league_id": 125,      # Liga Mexicana de Beisbol
         "historial": "historial_apuestas_lmb.json",
         "analisis": "analisis_hoy_lmb.json",
         "cuotas_reales": False,                # sin mercado publicado: cuotas estimadas
+        "odds_sport": None,
         "logo_id": 125,
+    },
+    "KBO": {
+        "nombre": "KBO",
+        # La MLB Stats API registra la KBO pero no publica sus partidos, asi que
+        # agenda y marcadores salen de The Odds API (misma fuente que las cuotas).
+        "fuente": "odds",
+        "sport_id": 32, "league_id": 161,
+        "historial": "historial_apuestas_kbo.json",
+        "analisis": "analisis_hoy_kbo.json",
+        "cuotas_reales": True,
+        "odds_sport": "baseball_kbo",
+        "logo_id": None,                       # sin escudos en esta fuente
     },
 }
 if "liga" not in st.session_state:
@@ -58,8 +74,16 @@ HISTORY_FILE = LIGA["historial"]
 ANALYSIS_CACHE = LIGA["analisis"]
 
 
+def _crear_fetcher(clave):
+    cfg = LIGAS[clave]
+    if cfg.get("fuente") == "odds":
+        from kbo_api import KBODataFetcher
+        return KBODataFetcher()
+    return MLBDataFetcher(sport_id=cfg["sport_id"], league_id=cfg["league_id"])
+
+
 def fetcher_liga():
-    return MLBDataFetcher(sport_id=LIGA["sport_id"], league_id=LIGA["league_id"])
+    return _crear_fetcher(st.session_state.liga)
 
 # En Streamlit Cloud la API key de The Odds API se guarda en "Secrets" (no en el código).
 # Aquí la pasamos a variable de entorno para que odds_api.py la lea. En local esto se ignora.
@@ -462,6 +486,77 @@ section[data-testid="stSidebar"] .st-key-liga_LMB .stButton > button{
     background-image:url("https://www.mlbstatic.com/team-logos/league-on-dark/125.svg") !important; }
 section[data-testid="stSidebar"] .st-key-liga_LMB .stButton > button[kind="primary"]{
     background-image:url("https://www.mlbstatic.com/team-logos/league-on-light/125.svg") !important; }
+/* KBO no tiene escudo en esa fuente: se deja el texto visible */
+section[data-testid="stSidebar"] .st-key-liga_KBO .stButton > button p,
+section[data-testid="stSidebar"] .st-key-liga_KBO .stButton > button div{
+    font-size:14px !important; line-height:1.2 !important; font-weight:800; }
+
+/* topbar acciones */
+.fh-top-actions{ display:flex; align-items:center; gap:10px; }
+.fh-ic-btn{ position:relative; width:38px; height:38px; border-radius:10px; border:1px solid rgb(var(--dkline));
+    background:rgb(var(--dk2)); color:rgb(var(--dkink2)); display:flex; align-items:center; justify-content:center; }
+.fh-ic-dot{ position:absolute; top:-5px; right:-5px; min-width:17px; height:17px; padding:0 4px; border-radius:999px;
+    background:rgb(var(--accent)); color:#fff; font-size:10.5px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+
+/* history rows */
+.fh-hrow{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 0;
+    border-bottom:1px solid rgb(var(--line)); font-size:13px; }
+
+/* filter pills (radio) */
+div[role="radiogroup"]{ flex-direction:row; flex-wrap:wrap; gap:8px; }
+div[role="radiogroup"] > label{ background:rgb(var(--surface2)); border:1px solid rgb(var(--line));
+    border-radius:999px; padding:7px 16px; margin:0; cursor:pointer; transition:all .15s; }
+div[role="radiogroup"] > label:hover{ border-color:rgb(var(--accent)/0.5); }
+div[role="radiogroup"] > label > div:first-child{ display:none !important; }
+div[role="radiogroup"] > label div, div[role="radiogroup"] > label p{ font-size:12.5px; font-weight:700;
+    letter-spacing:.03em; text-transform:uppercase; color:rgb(var(--ink2)); }
+div[role="radiogroup"] > label:has(input:checked){ background:rgb(var(--accent)); border-color:rgb(var(--accent)); }
+div[role="radiogroup"] > label:has(input:checked) div, div[role="radiogroup"] > label:has(input:checked) p{ color:#fff; }
+
+/* sidebar system card */
+.fh-sys{ border:1px solid rgb(var(--dkline)); background:rgb(var(--dk2)); border-radius:12px; padding:13px 14px; }
+.fh-sys-row{ display:flex; align-items:center; justify-content:space-between; }
+.fh-sys h4{ margin:0; font-size:13.5px; font-weight:700; color:#f1f5f9; }
+.fh-sys .lab{ font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:rgb(var(--dkink2)); margin:10px 0 1px 0; }
+.fh-sys .val{ font-size:13px; font-weight:600; color:#f1f5f9; font-variant-numeric:tabular-nums; }
+
+/* widget overrides */
+div[data-testid="stMetric"]{ display:none; }
+/* --- Barra lateral: marca pegada arriba y navegacion a la izquierda --- */
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{ padding-top:0 !important; }
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{ padding-top:0 !important; }
+/* La cabecera del sidebar (boton de colapsar) reservaba 60px de aire */
+section[data-testid="stSidebar"] [data-testid="stSidebarHeader"]{
+    height:auto !important; min-height:0 !important; padding:6px 0 0 0 !important; }
+.sb-brand{ display:flex; align-items:center; gap:12px; padding:0 0 18px 0;
+    border-bottom:1px solid rgb(var(--dkline)); margin-bottom:14px; }
+.sb-logo{ width:42px; height:42px; border-radius:12px; background:rgb(var(--accent));
+    color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.sb-logo-img{ width:46px; height:46px; object-fit:contain; flex-shrink:0; display:block; }
+.sb-name{ font-size:19px; font-weight:800; margin:0 !important; letter-spacing:-.02em;
+    color:#f8fafc; line-height:1.15; }
+.sb-tag{ font-size:12px !important; margin:1px 0 0 0 !important; color:rgb(var(--dkink2)); line-height:1.2; }
+.sb-lbl{ font-size:10.5px !important; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+    color:rgb(var(--dkink2)); margin:0 0 6px 0 !important; }
+.sb-sep{ border-bottom:1px solid rgb(var(--dkline)); margin:14px 0; }
+/* Botones de liga: se oculta el texto y se muestra el logo de la liga */
+section[data-testid="stSidebar"] [class*="stColumn"] .stButton > button{
+    height:54px; padding:6px !important; justify-content:center !important; }
+/* el atajo background del boton resetea estas propiedades: se fuerzan */
+section[data-testid="stSidebar"] [class*="st-key-liga"] .stButton > button{
+    background-repeat:no-repeat !important; background-position:center !important;
+    background-size:auto 28px !important; }
+section[data-testid="stSidebar"] [class*="stColumn"] .stButton > button p,
+section[data-testid="stSidebar"] [class*="stColumn"] .stButton > button div{
+    font-size:0 !important; line-height:0 !important; }
+section[data-testid="stSidebar"] .st-key-liga_MLB .stButton > button{
+    background-image:url("https://www.mlbstatic.com/team-logos/league-on-dark/1.svg") !important; }
+section[data-testid="stSidebar"] .st-key-liga_MLB .stButton > button[kind="primary"]{
+    background-image:url("https://www.mlbstatic.com/team-logos/league-on-light/1.svg") !important; }
+section[data-testid="stSidebar"] .st-key-liga_LMB .stButton > button{
+    background-image:url("https://www.mlbstatic.com/team-logos/league-on-dark/125.svg") !important; }
+section[data-testid="stSidebar"] .st-key-liga_LMB .stButton > button[kind="primary"]{
+    background-image:url("https://www.mlbstatic.com/team-logos/league-on-light/125.svg") !important; }
 
 section[data-testid="stSidebar"] .stButton > button{ border-radius:10px; font-weight:600; font-size:14.5px;
     padding:10px 14px; justify-content:flex-start !important; text-align:left !important; }
@@ -713,7 +808,8 @@ def get_todays_analysis():
         pass
     bets = get_analyzed_bets(fetcher_liga(),
                              con_cuotas_reales=LIGA["cuotas_reales"],
-                             con_demo=(st.session_state.liga == "MLB"))
+                             con_demo=(st.session_state.liga == "MLB"),
+                             odds_sport=LIGA.get("odds_sport") or "baseball_mlb")
 
     # SALVAGUARDA: verifica que los picks correspondan a los partidos de HOY.
     # Si la fuente de datos devolviera otra jornada (por ejemplo la de ayer, ya
@@ -914,13 +1010,13 @@ def settle_pick(matchup, selection, market, games):
 
 
 @st.cache_data(ttl=900)
-def _scores_date(dia, sport_id, league_id):
-    return MLBDataFetcher(sport_id=sport_id, league_id=league_id).get_live_scores(date=dia)
+def _scores_date(dia, clave):
+    return _crear_fetcher(clave).get_live_scores(date=dia)
 
 
 def scores_for_date(dia):
     """Resultados de una fecha concreta (para cerrar picks de dias anteriores)."""
-    return _scores_date(dia, LIGA["sport_id"], LIGA["league_id"])
+    return _scores_date(dia, st.session_state.liga)
 
 
 def auto_settle_db(games):
@@ -969,12 +1065,19 @@ def enrich_history(df, bankroll):
 
 
 @st.cache_data(ttl=60)
-def _live_scores(sport_id, league_id):
-    return MLBDataFetcher(sport_id=sport_id, league_id=league_id).get_live_scores()
+def _live_scores_mlb(clave):
+    return _crear_fetcher(clave).get_live_scores()
+
+
+@st.cache_data(ttl=600)          # esta fuente consume creditos: se refresca menos
+def _live_scores_odds(clave):
+    return _crear_fetcher(clave).get_live_scores()
 
 
 def fetch_live_scores():
-    return _live_scores(LIGA["sport_id"], LIGA["league_id"])
+    clave = st.session_state.liga
+    return (_live_scores_odds(clave) if LIGA.get("fuente") == "odds"
+            else _live_scores_mlb(clave))
 
 
 BANKROLL_INICIAL = 10000.0     # pesos, desde el dia 1

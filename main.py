@@ -68,7 +68,7 @@ def _market_lean(game_id, market):
     return (key % 90) / 1000.0 - 0.035
 
 
-def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True):
+def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport="baseball_mlb"):
     """CONEXIÓN A DATOS REALES (Camino 2).
 
     Toma la agenda REAL de la MLB del día y calcula cada pick con las MISMAS
@@ -106,7 +106,7 @@ def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True):
     offense_agent = OffenseAgent()
     try:
         # Ligas sin mercado publicado (LMB) van con cuotas estimadas.
-        real_odds = OddsDataFetcher().get_moneyline_odds() if con_cuotas_reales else {}
+        real_odds = OddsDataFetcher(sport=odds_sport).get_moneyline_odds() if con_cuotas_reales else {}
     except Exception:
         real_odds = {}
 
@@ -251,14 +251,14 @@ def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True):
     return bets
 
 
-def get_analyzed_bets(fetcher=None, con_cuotas_reales=True, con_demo=True):
+def get_analyzed_bets(fetcher=None, con_cuotas_reales=True, con_demo=True, odds_sport="baseball_mlb"):
     """Genera y ordena los picks del motor multi-agente.
 
     Fuente de datos: agenda REAL de la MLB del día (vía _build_bets_from_real_games).
     Si no hay conexión, usa el set de ejemplo fijo (_demo_bets). La lógica de
     ordenamiento, stake, tag y aprobación del Chief Tipster NO cambia.
     """
-    raw_bets = _build_bets_from_real_games(fetcher, con_cuotas_reales)
+    raw_bets = _build_bets_from_real_games(fetcher, con_cuotas_reales, odds_sport)
     if not raw_bets and con_demo:
         raw_bets = _demo_bets()
     if not raw_bets:

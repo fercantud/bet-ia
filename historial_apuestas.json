@@ -963,8 +963,8 @@
    "ev": -0.0851,
    "kelly_stake": 0.0,
    "model_confidence": 6.1,
-   "result": "PENDING",
-   "profit_loss": 0.0
+   "result": "LOST",
+   "profit_loss": -0.0
   },
   {
    "id": 127,

@@ -62,7 +62,8 @@
       "Bash(git commit -q -m 'Agregar LMB \\(Liga Mexicana de Beisbol\\) como liga aparte *)",
       "Bash(git commit -q -m 'Corregir historial de LMB contaminado con partidos de MLB *)",
       "Bash(powershell -Command ' *)",
-      "Bash(git commit -q -m 'Cerrar la tabla de Jornada con borde, igual que la de Resultados *)"
+      "Bash(git commit -q -m 'Cerrar la tabla de Jornada con borde, igual que la de Resultados *)",
+      "Bash(git commit -q -m 'Agregar KBO \\(liga coreana\\) como tercera liga *)"
     ]
   }
 }
