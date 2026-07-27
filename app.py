@@ -337,7 +337,8 @@ svg{ display:inline-block; vertical-align:middle; }
 
 /* ---- Tabla unificada de la jornada (estilo Bloomberg/ESPN) ---- */
 /* sin alto maximo: se ven todas las filas, sin scroll vertical interno */
-.fh-tablewrap{ overflow-x:auto; border-radius:10px; }
+/* mismo cierre que la tabla de Resultados: borde sutil y esquinas redondeadas */
+.fh-tablewrap{ overflow-x:auto; border:1px solid rgb(var(--line)); border-radius:12px; }
 .fh-mtable{ width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
 .fh-mtable thead th{ position:sticky; top:0; z-index:2; background:rgb(var(--surface2));
     color:rgb(var(--ink2)); font-size:10.5px; font-weight:700; letter-spacing:.07em;
