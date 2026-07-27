@@ -67,8 +67,28 @@ try:
 except Exception:
     pass
 
-st.set_page_config(page_title="BET IA · MLB Radar", page_icon="🛰️", layout="wide",
-                   initial_sidebar_state="expanded")
+# Logo oficial: basta con dejar el archivo en la carpeta del proyecto.
+# Se acepta logo.png / logo.jpg / logo.webp / logo.svg (en ese orden).
+LOGO_FILE = next((f for f in ("logo.png", "logo.jpg", "logo.jpeg", "logo.webp", "logo.svg")
+                  if os.path.exists(f)), None)
+
+
+def _logo_data_uri():
+    """El logo embebido en la pagina (no depende de rutas externas)."""
+    if not LOGO_FILE:
+        return None
+    try:
+        import base64
+        mime = "image/svg+xml" if LOGO_FILE.endswith(".svg") else                ("image/webp" if LOGO_FILE.endswith(".webp") else
+                ("image/jpeg" if LOGO_FILE.endswith((".jpg", ".jpeg")) else "image/png"))
+        with open(LOGO_FILE, "rb") as f:
+            return f"data:{mime};base64," + base64.b64encode(f.read()).decode()
+    except Exception:
+        return None
+
+
+st.set_page_config(page_title="BET IA · Radar", page_icon=(LOGO_FILE or "⚾"),
+                   layout="wide", initial_sidebar_state="expanded")
 
 # ---------------------------------------------------------------------------
 # Design system (dark quant) — basado en tokens de FlightHunter
@@ -414,6 +434,7 @@ section[data-testid="stSidebar"] [data-testid="stSidebarHeader"]{
     border-bottom:1px solid rgb(var(--dkline)); margin-bottom:14px; }
 .sb-logo{ width:42px; height:42px; border-radius:12px; background:rgb(var(--accent));
     color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.sb-logo-img{ width:46px; height:46px; object-fit:contain; flex-shrink:0; display:block; }
 .sb-name{ font-size:19px; font-weight:800; margin:0 !important; letter-spacing:-.02em;
     color:#f8fafc; line-height:1.15; }
 .sb-tag{ font-size:12px !important; margin:1px 0 0 0 !important; color:rgb(var(--dkink2)); line-height:1.2; }
@@ -1241,8 +1262,9 @@ if "page" not in st.session_state:
 with st.sidebar:
     st.markdown(
         '<div class="sb-brand">'
-        '<div class="sb-logo">' + svg("bar", 22) + '</div>'
-        '<div><p class="sb-name">BET IA</p>'
+        + (f'<img class="sb-logo-img" src="{_logo_data_uri()}" alt="BET IA"/>'
+           if _logo_data_uri() else '<div class="sb-logo">' + svg("bar", 22) + '</div>')
+        + '<div><p class="sb-name">BET IA</p>'
         '<p class="sb-tag">Radar multideporte · Quant</p></div></div>',
         unsafe_allow_html=True,
     )
