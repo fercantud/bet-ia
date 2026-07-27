@@ -359,7 +359,7 @@ svg{ display:inline-block; vertical-align:middle; }
 .fh-mtable tbody tr.r-won  .pick-nm{ color:rgb(var(--save)); }
 .fh-mtable tbody tr.r-lost .pick-nm{ color:rgb(var(--fare)); }
 .fh-mtable .num{ text-align:right; font-variant-numeric:tabular-nums; font-weight:700; white-space:nowrap; }
-.fh-mtable .c-hora{ width:82px; font-variant-numeric:tabular-nums; font-weight:700;
+.fh-mtable .c-hora{ width:100px; font-variant-numeric:tabular-nums; font-weight:700;
     color:rgb(var(--ink2)); white-space:nowrap; }
 .fh-mtable tr.live .c-hora{ color:rgb(var(--accent)); }
 .fh-mtable .c-est{ width:170px; white-space:nowrap; }
@@ -569,9 +569,19 @@ def card_header(title, subtitle, icon, right_badge="", hl=False):
     )
 
 
+def hora12(dt, con_segundos=False):
+    """Hora en formato de 12 horas: '8:38 p.m.' (sin cero a la izquierda)."""
+    h = dt.hour % 12 or 12
+    sufijo = "a.m." if dt.hour < 12 else "p.m."
+    reloj = f"{h}:{dt.minute:02d}" + (f":{dt.second:02d}" if con_segundos else "")
+    return f"{reloj} {sufijo}"
+
+
 def fmt_start(iso):
+    """Hora de inicio del partido en la zona horaria de la app (no la del servidor)."""
     try:
-        return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone().strftime("%H:%M")
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+        return hora12(dt.astimezone(_TZ) if _TZ else dt.astimezone())
     except Exception:
         return ""
 
@@ -1304,7 +1314,7 @@ with st.sidebar:
             st.rerun()
 
     live_now = [x for x in fetch_live_scores() if x["is_live"]]
-    now = now_local().strftime("%H:%M:%S")
+    now = hora12(now_local(), con_segundos=True)
     st.markdown(
         f'<div style="margin-top:16px;padding-top:14px;border-top:1px solid rgb(var(--dkline));">'
         f'<p style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;'
@@ -1536,7 +1546,7 @@ def render_en_vivo():
             cuerpo = '<p style="color:rgb(var(--ink2));font-size:13.5px;margin:0;">Nada por aquí.</p>'
         st.markdown(cuerpo, unsafe_allow_html=True)
 
-    st.caption(f"Datos en caché 60s · última lectura {now_local().strftime('%H:%M:%S')}")
+    st.caption(f"Datos en caché 60s · última lectura {hora12(now_local(), con_segundos=True)}")
 
 
 # ---------------------------------------------------------------------------
