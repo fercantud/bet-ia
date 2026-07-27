@@ -861,8 +861,16 @@ def fetch_live_scores():
     return MLBDataFetcher().get_live_scores()
 
 
+BANKROLL_INICIAL = 10000.0     # pesos, desde el dia 1
+
+
 def bankroll_default():
-    return float(st.session_state.get("bankroll_ini", 100.0))
+    return float(st.session_state.get("bankroll_ini", BANKROLL_INICIAL))
+
+
+def mxn(v, signo=False):
+    """Formatea un monto en pesos: $1,234.56 (con separador de miles)."""
+    return f"{'+' if signo and v > 0 else ''}${v:,.2f}"
 
 
 # Cierre automático de picks contra los resultados reales de la MLB
@@ -1258,7 +1266,7 @@ def render_dashboard():
     stat_tile(c[0], "Partidos analizados", str(len(sorted_bets)), "jornada de hoy", True, "contrast", "fare")
     stat_tile(c[1], "Picks aprobados", str(len(approved_picks)), "+EV detectado", True, "target", "fare")
     stat_tile(c[2], "En vivo ahora", str(len(live_now)), "marcadores activos", len(live_now) > 0, "radio", "save")
-    stat_tile(c[3], "P&L acumulado", f"{net:+.2f}", "unidades netas", net >= 0, "dollar", "warn")
+    stat_tile(c[3], "P&L acumulado", mxn(net, signo=True), "pesos netos", net >= 0, "dollar", "warn")
     st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
 
     tp, dg = st.columns(2, gap="large")
@@ -1460,8 +1468,9 @@ def render_resultados():
     auto_settle_db(live)  # cierra lo que ya finalizó
     hist = load_history()
 
-    ini = st.number_input("Bankroll inicial (unidades)", min_value=1.0,
-                          value=bankroll_default(), step=10.0, key="bankroll_ini")
+    ini = st.number_input("Bankroll inicial (pesos)", min_value=100.0,
+                          value=bankroll_default(), step=500.0, format="%.2f",
+                          key="bankroll_ini")
 
     en = enrich_history(hist, ini)
     settled = en[en["result"] != "PENDING"]
@@ -1482,7 +1491,7 @@ def render_resultados():
     stat_tile(c[0], "Ganados", str(wins), "resultados +", True, "trophy", "save")
     stat_tile(c[1], "Perdidos", str(losses), "resultados -", False, "target", "warn")
     stat_tile(c[2], "Win rate", f"{wr:.1f}%", f"{len(settled)} resueltos", wr >= 50, "bar", "accent")
-    stat_tile(c[3], "Saldo actual", f"{saldo:.2f}", f"{net:+.2f} neto", net >= 0, "dollar", "warn")
+    stat_tile(c[3], "Saldo actual", mxn(saldo), f"{mxn(net, signo=True)} neto", net >= 0, "dollar", "warn")
 
     # ---- Tabla Excel 1: resumen diario ----
     en["dia"] = en["date"].astype(str).str[:10]
@@ -1600,7 +1609,7 @@ def render_resultados():
         st.markdown(
             f'<p class="rt-resumen">{len(det_f)} apuestas &nbsp;·&nbsp; ✅ <b>{n_gan}</b> ganadas '
             f'&nbsp;·&nbsp; ❌ <b>{n_per}</b> perdidas &nbsp;·&nbsp; beneficio '
-            f'<b style="color:rgb({color});">{ben:+.2f} u</b></p>',
+            f'<b style="color:rgb({color});">{mxn(ben, signo=True)}</b></p>',
             unsafe_allow_html=True)
         # Tabla propia (HTML) para poder mostrar logos y el resultado como badge
         tone = {"Ganado": "save", "Perdido": "fare", "Push": "warn"}
@@ -1616,8 +1625,8 @@ def render_resultados():
                 f'<td class="num">{r["Cuota"]:.2f}</td>'
                 f'<td class="num">{r["Stake %"]:.2f}%</td>'
                 f'<td>{badge(r["Resultado"], tone.get(r["Resultado"], "neutral"))}</td>'
-                f'<td class="num rt-pl {cls}">{pl:+.2f}</td>'
-                f'<td class="num">{float(r["Saldo"]):.2f}</td></tr>'
+                f'<td class="num rt-pl {cls}">{pl:+,.2f}</td>'
+                f'<td class="num">{mxn(float(r["Saldo"]))}</td></tr>'
             )
         st.markdown(
             '<div class="rt-wrap"><table class="rt-table"><thead><tr>'
@@ -1672,7 +1681,7 @@ def render_resultados():
                     update_result(row["id"], choice, row["odds"], row["kelly_stake"])
                     st.rerun()
 
-    page_section("Evolución del saldo", "Bankroll acumulado en el tiempo")
+    page_section("Evolución del saldo", "Bankroll en pesos a lo largo del tiempo")
     st.line_chart(en.set_index("date")["saldo"])
 
 
@@ -1708,13 +1717,13 @@ def render_rendimiento():
 
     section_header("Métricas históricas", "Sobre el total de picks registrados")
     c = st.columns(4, gap="large")
-    stat_tile(c[0], "Unidades apostadas", f"{staked:.2f}", "picks cerrados", True, "dollar", "accent")
-    stat_tile(c[1], "Beneficio neto", f"{net:+.2f}", "unidades", net >= 0, "trophy", "save")
+    stat_tile(c[0], "Total apostado", mxn(staked), "picks cerrados", True, "dollar", "accent")
+    stat_tile(c[1], "Beneficio neto", mxn(net, signo=True), "pesos", net >= 0, "trophy", "save")
     stat_tile(c[2], "ROI / Yield", f"{roi:+.1f}%", "sobre lo apostado", roi >= 0, "bar", "purple")
     stat_tile(c[3], "Cuota media", f"{avg_odds:.2f}", f"EV medio {avg_ev:+.1f}%", avg_ev >= 0, "target", "warn")
 
     if len(settled):
-        section_header("P&L por apuesta cerrada", "Ganancia/pérdida individual (unidades)")
+        section_header("P&L por apuesta cerrada", "Ganancia/pérdida individual (pesos)")
         st.bar_chart(settled.sort_values("date").set_index("date")["pl_units"])
 
     section_header("Evolución del saldo", "Curva acumulada")

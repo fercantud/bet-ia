@@ -56,7 +56,8 @@
       "Bash(venv/Scripts/python.exe -m pytest test_fecha_jornada.py -q -p no:cacheprovider)",
       "Bash(rm -f historial_antes_fix.json)",
       "Bash(git commit -q -m 'Arreglo: pedir la jornada por fecha explicita a la MLB API *)",
-      "Bash(git commit -q -m 'Fondo de pagina blanco en lugar de gris claro *)"
+      "Bash(git commit -q -m 'Fondo de pagina blanco en lugar de gris claro *)",
+      "Bash(git commit -q -m 'Bankroll de $10,000 pesos desde el dia 1 *)"
     ]
   }
 }
