@@ -124,11 +124,20 @@ class MLBDataFetcher:
             return []
 
     def get_pitcher_stats(self, pitcher_id: int) -> dict:
-        """Fetch en tiempo real de métricas de pitcheo vía MLB API."""
+        """Fetch en tiempo real de métricas de pitcheo vía MLB API.
+
+        La consulta lleva el sportId de la liga del fetcher. Sin él, la API
+        devuelve solo las estadísticas de MLB y los abridores de la LMB salían
+        SIN STATS: el motor caía al ERA genérico de 4.15 para los dos lados de
+        cada partido, así que todas las probabilidades quedaban pegadas al 50%.
+        Para MLB (sportId=1) el resultado es idéntico al de antes.
+        """
         if not pitcher_id:
             return {"era": 4.15, "xera": 4.10, "whip": 1.28, "k_pct": 0.22, "bb_pct": 0.08}
         try:
-            url = f"{self.BASE_URL}/people/{pitcher_id}?hydrate=stats(group=[pitching],type=[season])"
+            temporada = _hoy()[:4]
+            url = (f"{self.BASE_URL}/people/{pitcher_id}?hydrate=stats(group=[pitching],"
+                   f"type=[season],sportId={self.sport_id},season={temporada})")
             res = requests.get(url, timeout=5).json()
             stats = res['people'][0]['stats'][0]['splits'][0]['stat']
             era = float(stats.get('era', 4.15))
