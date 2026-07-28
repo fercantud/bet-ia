@@ -1,17 +1,32 @@
 """Lector de datos para la KBO (liga coreana).
 
 A diferencia de MLB y LMB, la KBO NO tiene datos en la MLB Stats API: esa API
-registra la liga (sportId=32) pero devuelve 0 partidos. Por eso aquí la agenda y
-los marcadores se leen de The Odds API, que sí la cubre.
+registra la liga (sportId=32) pero devuelve 0 partidos.
+
+La primera versión leía la agenda y los marcadores de The Odds API, pero esa
+fuente resultó inservible para llevar historial: publica los partidos poco antes
+de empezar y los BORRA sin dejar resultado. El 28/07/2026 pasó de devolver 1 de
+5 partidos a devolver 0, y los picks de ese día se quedaron sin poder cerrarse.
+
+Ahora la agenda y los marcadores salen de MyKBO Stats, que expone un bloque por
+fecha en /api/v2/games/game-day-block/YYYY-MM-DD. Devuelve un fragmento de HTML
+pequeño y estable con los cinco partidos del día, su estado y su marcador, y
+—clave— sigue disponible para fechas pasadas, así que los picks atrasados se
+pueden cerrar. Su robots.txt lo permite (solo bloquea /stats/compare/) y pide
+Crawl-delay: 5; la app cachea estas llamadas, así que se consultan pocas veces.
+
+The Odds API se sigue usando, pero SOLO para las cuotas (ver odds_api.py).
 
 Expone la misma interfaz que MLBDataFetcher, para que el motor no note la
 diferencia: get_todays_games(), get_live_scores() y get_pitcher_stats().
 
-LIMITACIÓN IMPORTANTE: esta fuente no publica estadísticas de abridores, así que
-get_pitcher_stats() siempre devuelve valores genéricos. El modelo pierde su
-insumo principal y sus probabilidades son mucho más débiles que en MLB.
+LIMITACIONES: esta fuente no publica estadísticas de abridores, así que
+get_pitcher_stats() siempre devuelve valores genéricos y el modelo pierde su
+insumo principal. Tampoco expone el parcial de 5 entradas, de modo que los picks
+F5 no se pueden cerrar (el motor no los elige, ver main.py).
 """
-import os
+import re
+import time
 from datetime import datetime
 
 import requests
@@ -22,100 +37,136 @@ try:
 except Exception:
     _TZ = None
 
-SPORT = "baseball_kbo"
-BASE = "https://api.the-odds-api.com/v4/sports"
+BLOQUE_DIA = "https://mykbostats.com/api/v2/games/game-day-block/{fecha}"
+_UA = {"User-Agent": "BetIA/1.0 (dashboard personal de apuestas)"}
 
 # Valores genéricos: sin stats de abridores disponibles para esta liga.
 _PITCHER_DEFAULT = {"era": 4.15, "xera": 4.10, "whip": 1.28, "k_pct": 0.22, "bb_pct": 0.08}
+
+# Caché en memoria del proceso. get_todays_games() y get_live_scores() suelen
+# pedir la misma fecha seguidas; sin esto se harían dos descargas por render.
+_CACHE = {}
+_CACHE_TTL = 120
 
 
 def _hoy() -> str:
     return (datetime.now(_TZ) if _TZ else datetime.now()).strftime("%Y-%m-%d")
 
 
-def _a_local(iso: str) -> str:
-    """Fecha local (YYYY-MM-DD) de un instante UTC."""
+def _texto(html: str) -> str:
+    """Quita etiquetas y colapsa espacios."""
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()
+
+
+def _descargar(fecha: str) -> str:
+    en_cache = _CACHE.get(fecha)
+    if en_cache and (time.time() - en_cache[0]) < _CACHE_TTL:
+        return en_cache[1]
     try:
-        dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
-        return (dt.astimezone(_TZ) if _TZ else dt.astimezone()).strftime("%Y-%m-%d")
+        r = requests.get(BLOQUE_DIA.format(fecha=fecha), headers=_UA, timeout=10)
+        html = r.text if r.status_code == 200 else ""
     except Exception:
-        return ""
+        html = ""
+    _CACHE[fecha] = (time.time(), html)
+    return html
+
+
+def _parsear(html: str) -> list:
+    """Convierte el fragmento HTML en una lista de partidos.
+
+    Cada tarjeta trae dos bloques ds-game-team (visitante primero, local
+    después). El marcador solo existe si el partido ya empezó.
+    """
+    partidos = []
+    for card in re.split(r'<a id="game-line-', html)[1:]:
+        try:
+            gid = re.match(r"(\d+)", card).group(1)
+            equipos = re.findall(r'<div class="ds-game-team[^"]*">(.*?)</div>', card, re.S)
+            if len(equipos) != 2:
+                continue
+
+            datos = []
+            for blk in equipos:
+                nombre = re.search(r'__name">(.*?)</span>\s*</span>', blk, re.S)
+                marca = re.search(r'__score">\s*(-?\d+)\s*</span>', blk)
+                datos.append((_texto(nombre.group(1)) if nombre else "",
+                              int(marca.group(1)) if marca else None))
+            (away, away_r), (home, home_r) = datos
+            if not (away and home):
+                continue
+
+            est = re.search(r'ds-game-card__state[^"]*">(.*?)</span>', card, re.S)
+            estado_txt = _texto(est.group(1)) if est else ""
+            cuando = re.search(r'<time[^>]*datetime="([^"]+)"', card)
+
+            # "Final" o "Final/10" (entradas extra). Si no dice Final pero ya hay
+            # marcador, está en curso.
+            final = estado_txt.lower().startswith("final")
+            empezado = away_r is not None and home_r is not None
+            extra = re.search(r"Final/(\d+)", estado_txt)
+
+            partidos.append({
+                "game_id": gid,
+                "away_team": away, "home_team": home,
+                "away_score": away_r or 0, "home_score": home_r or 0,
+                "final": final, "empezado": empezado,
+                "entradas": int(extra.group(1)) if extra else (9 if final else 0),
+                "estado_txt": estado_txt,
+                "start_utc": cuando.group(1) if cuando else "",
+            })
+        except Exception:
+            continue
+    return partidos
 
 
 class KBODataFetcher:
-    """Agenda y marcadores de la KBO vía The Odds API."""
+    """Agenda y marcadores de la KBO vía MyKBO Stats."""
 
     def __init__(self, api_key: str = None, fecha: str = None):
-        # `fecha` fija la jornada a consultar. La app le pasa la fecha con el
-        # desfase de la liga (Corea juega de madrugada en hora Central).
-        self.api_key = api_key or os.getenv("ODDS_API_KEY", "")
+        # `api_key` se conserva por compatibilidad con la firma anterior; esta
+        # fuente no la necesita. `fecha` fija la jornada a consultar: la app le
+        # pasa la fecha con el desfase de la liga (Corea juega de madrugada en
+        # hora Central).
+        self.api_key = api_key
         self.fecha = fecha
 
-    def _scores(self, days_from: int = 3) -> list:
-        """Consulta cruda. Incluye partidos recientes y próximos."""
-        if not self.api_key:
-            return []
-        try:
-            r = requests.get(f"{BASE}/{SPORT}/scores",
-                             params={"apiKey": self.api_key, "daysFrom": days_from},
-                             timeout=10)
-            return r.json() if r.status_code == 200 else []
-        except Exception:
-            return []
+    def _partidos(self, date: str = None) -> list:
+        # La fecha del bloque es la coreana. Los partidos empiezan a las 18:30
+        # KST = 04:30 Central del MISMO día, así que ambas fechas coinciden y no
+        # hace falta convertir.
+        return _parsear(_descargar(date or self.fecha or _hoy()))
 
     def get_todays_games(self, date: str = None) -> list:
-        dia = date or self.fecha or _hoy()
-        salida = []
-        for g in self._scores():
-            if _a_local(g.get("commence_time")) != dia:
-                continue
-            salida.append({
-                "game_id": str(g.get("id", "")),
-                "away_team": g.get("away_team", "Away"),
-                "home_team": g.get("home_team", "Home"),
-                # Sin datos de abridores en esta fuente
-                "away_pitcher_id": 0,
-                "home_pitcher_id": 0,
-                "pitchers_confirmed": False,
-            })
-        return salida
+        return [{
+            "game_id": g["game_id"],
+            "away_team": g["away_team"],
+            "home_team": g["home_team"],
+            # Sin datos de abridores en esta fuente
+            "away_pitcher_id": 0,
+            "home_pitcher_id": 0,
+            "pitchers_confirmed": False,
+        } for g in self._partidos(date)]
 
     def get_live_scores(self, date: str = None) -> list:
-        dia = date or self.fecha or _hoy()
         salida = []
-        for g in self._scores():
-            if _a_local(g.get("commence_time")) != dia:
-                continue
-
-            marcador = {s.get("name"): s.get("score") for s in (g.get("scores") or [])}
-
-            def _n(equipo):
-                try:
-                    return int(marcador.get(equipo) or 0)
-                except (TypeError, ValueError):
-                    return 0
-
-            away, home = g.get("away_team", "Away"), g.get("home_team", "Home")
-            terminado = bool(g.get("completed"))
-            empezado = bool(g.get("scores"))
-            estado = "Final" if terminado else ("Live" if empezado else "Preview")
-
+        for g in self._partidos(date):
+            estado = "Final" if g["final"] else ("Live" if g["empezado"] else "Preview")
             salida.append({
-                "game_id": str(g.get("id", "")),
-                "away_team": away, "home_team": home,
+                "game_id": g["game_id"],
+                "away_team": g["away_team"], "home_team": g["home_team"],
                 "away_id": 0, "home_id": 0,          # sin logos en esta fuente
-                "away_score": _n(away), "home_score": _n(home),
+                "away_score": g["away_score"], "home_score": g["home_score"],
                 "away_hits": 0, "home_hits": 0,
                 "away_errors": 0, "home_errors": 0,
-                "away_f5": 0, "home_f5": 0,
-                "innings_played": 0,
+                "away_f5": 0, "home_f5": 0,          # la fuente no da el parcial de 5
+                "innings_played": g["entradas"],
                 "on_first": False, "on_second": False, "on_third": False,
                 "state": estado,
-                "detail": "Final" if terminado else ("En juego" if empezado else "Programado"),
+                "detail": "Final" if g["final"] else ("En juego" if g["empezado"] else "Programado"),
                 "is_live": estado == "Live",
-                "is_final": terminado,
+                "is_final": g["final"],
                 "inning": 0, "inning_ordinal": "", "inning_state": "", "outs": 0,
-                "start_utc": g.get("commence_time", ""),
+                "start_utc": g["start_utc"],
                 "away_pitcher": "", "home_pitcher": "",
             })
         return salida

@@ -55,9 +55,9 @@ LIGAS = {
     },
     "KBO": {
         "nombre": "KBO",
-        # La MLB Stats API registra la KBO pero no publica sus partidos, asi que
-        # agenda y marcadores salen de The Odds API (misma fuente que las cuotas).
-        "fuente": "odds",
+        # La MLB Stats API registra la KBO pero no publica sus partidos. Agenda y
+        # marcadores salen de MyKBO Stats; The Odds API solo aporta las cuotas.
+        "fuente": "mykbo",
         "sport_id": 32, "league_id": 161,
         "historial": "historial_apuestas_kbo.json",
         "analisis": "analisis_hoy_kbo.json",
@@ -86,7 +86,7 @@ def fecha_jornada(clave=None):
 
 def _crear_fetcher(clave):
     cfg = LIGAS[clave]
-    if cfg.get("fuente") == "odds":
+    if cfg.get("fuente") == "mykbo":
         from kbo_api import KBODataFetcher
         return KBODataFetcher(fecha=fecha_jornada(clave))
     return MLBDataFetcher(sport_id=cfg["sport_id"], league_id=cfg["league_id"])
@@ -938,7 +938,7 @@ def settle_pick(matchup, selection, market, games):
         line = float(m.group(1)) if m else 8.5
         total = g["away_score"] + g["home_score"]
         if total == line:
-            return None
+            return "PUSH"  # el total cae justo en la linea = devolucion
         if "under" in sel:
             return "WON" if total < line else "LOST"
         return "WON" if total > line else "LOST"   # over
@@ -954,7 +954,7 @@ def settle_pick(matchup, selection, market, games):
 
     # Moneyline: la selección nombra al equipo
     if g["home_score"] == g["away_score"]:
-        return None
+        return "PUSH"  # partido finalizado en empate (la KBO los permite) = devolucion
     winner = g["home_team"] if g["home_score"] > g["away_score"] else g["away_team"]
     return "WON" if _team_match(selection, winner) else "LOST"
 
@@ -1019,14 +1019,14 @@ def _live_scores_mlb(clave):
     return _crear_fetcher(clave).get_live_scores()
 
 
-@st.cache_data(ttl=600)          # esta fuente consume creditos: se refresca menos
-def _live_scores_odds(clave):
+@st.cache_data(ttl=300)          # sitio externo con Crawl-delay: se refresca menos
+def _live_scores_mykbo(clave):
     return _crear_fetcher(clave).get_live_scores()
 
 
 def fetch_live_scores():
     clave = st.session_state.liga
-    return (_live_scores_odds(clave) if LIGA.get("fuente") == "odds"
+    return (_live_scores_mykbo(clave) if LIGA.get("fuente") == "mykbo"
             else _live_scores_mlb(clave))
 
 
