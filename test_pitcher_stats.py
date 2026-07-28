@@ -88,6 +88,39 @@ def test_el_generico_no_se_comparte_entre_fetchers():
     assert MLBDataFetcher().get_pitcher_stats(0) == GENERICO
 
 
+def test_el_generico_no_viaja_en_el_constructor():
+    """Streamlit relanza app.py pero reutiliza los módulos ya importados.
+
+    El 28/07 la app se cayó entera (local y en la nube) con
+    `TypeError: got an unexpected keyword argument 'stats_genericas'`: app.py ya
+    era nuevo y mlb_api seguía siendo el viejo. Asignando el atributo despues de
+    construir, un modulo desactualizado solo ignora el ajuste.
+    """
+    import os
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.py")
+    codigo = open(ruta, encoding="utf-8").read()
+    assert "stats_genericas=stats_genericas_liga" not in codigo, (
+        "no pases el generico al constructor: asignalo despues de construir")
+    assert "fetcher.stats_genericas = " in codigo
+
+
+def test_un_modulo_viejo_no_tumba_la_app():
+    """Documenta el modo de falla: el kwarg revienta, el atributo no."""
+    class MLBDataFetcherViejo:                       # firma anterior a la mejora
+        def __init__(self, sport_id=1, league_id=None):
+            self.sport_id, self.league_id = sport_id, league_id
+
+    try:
+        MLBDataFetcherViejo(sport_id=23, stats_genericas={"era": 5.08})
+        assert False, "la firma vieja deberia rechazar el argumento"
+    except TypeError:
+        pass
+
+    f = MLBDataFetcherViejo(sport_id=23)             # asi es como lo hace la app
+    f.stats_genericas = {"era": 5.08}
+    assert f.stats_genericas["era"] == 5.08
+
+
 def test_la_linea_por_defecto_sigue_siendo_8_5():
     """El 8.5 histórico se conserva salvo que quien llame pase otro valor:
     así MLB no cambia aunque la firma sí."""

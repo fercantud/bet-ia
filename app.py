@@ -127,8 +127,18 @@ def _crear_fetcher(clave):
     if cfg.get("fuente") == "mykbo":
         from kbo_api import KBODataFetcher
         return KBODataFetcher(fecha=fecha_jornada(clave))
-    return MLBDataFetcher(sport_id=cfg["sport_id"], league_id=cfg["league_id"],
-                          stats_genericas=stats_genericas_liga(clave))
+
+    fetcher = MLBDataFetcher(sport_id=cfg["sport_id"], league_id=cfg["league_id"])
+    # El generico se asigna DESPUES de construir, no como argumento. Streamlit
+    # relanza app.py cuando cambia, pero reutiliza los modulos ya importados: si
+    # aqui se pasara stats_genericas= y mlb_api siguiera siendo el viejo, el
+    # TypeError tumbaria la app entera hasta reiniciar el proceso. Asignando el
+    # atributo, un modulo desactualizado solo ignora el ajuste y sigue con el
+    # generico de MLB; la app no se cae y se corrige sola al reiniciar.
+    generico = stats_genericas_liga(clave)
+    if generico:
+        fetcher.stats_genericas = dict(generico)
+    return fetcher
 
 
 def fetcher_liga():
