@@ -15,7 +15,7 @@ FlightHunter/
 
 # Datos locales / generados
 bet_ia_performance.db
-historial_apuestas.backup.json
+*.backup.json
 # NOTA: historial_apuestas.json y analisis_hoy.json SI se suben, para que la app
 # en la nube muestre exactamente los mismos picks e historial que la local.
 bet_ia_audit_tracker.csv
