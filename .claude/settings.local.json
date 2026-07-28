@@ -65,7 +65,11 @@
       "Bash(git commit -q -m 'Cerrar la tabla de Jornada con borde, igual que la de Resultados *)",
       "Bash(git commit -q -m 'Agregar KBO \\(liga coreana\\) como tercera liga *)",
       "Bash(git commit -q -m 'KBO: adelantar la jornada un dia *)",
-      "Bash(git commit -q -m 'Escudos para KBO: equipos y logo de liga *)"
+      "Bash(git commit -q -m 'Escudos para KBO: equipos y logo de liga *)",
+      "Bash(git checkout *)",
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('app.py',encoding='utf-8'\\).read\\(\\)\\); print\\('restaurado, syntax OK'\\)\")",
+      "Bash(awk '{print $NF, $5\" bytes\"}')",
+      "Bash(git commit -q -m 'Logos oficiales: bateador \\(marca\\) y KBO, con CSS deduplicado *)"
     ]
   }
 }
