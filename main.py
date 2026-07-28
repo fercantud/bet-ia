@@ -68,7 +68,8 @@ def _market_lean(game_id, market):
     return (key % 90) / 1000.0 - 0.035
 
 
-def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport="baseball_mlb"):
+def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport="baseball_mlb",
+                                linea_por_defecto=8.5):
     """CONEXIÓN A DATOS REALES (Camino 2).
 
     Toma la agenda REAL de la MLB del día y calcula cada pick con las MISMAS
@@ -143,9 +144,12 @@ def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport
             # aquí solo sirven para obtener las probabilidades; el edge se recalcula abajo
             # con cuotas reales (si hay API key) o estimadas de forma realista.
             # Linea REAL de totales de la casa para este partido (7.5, 9.0, 10.5...).
-            # Si no hay cuotas reales se usa 8.5 como antes.
+            # Sin cuotas reales se usa la linea base de la liga: 8.5 esta calibrado
+            # para MLB y en ligas mas anotadoras convierte cualquier Over en una
+            # apuesta ganadora por construccion (en LMB el 59% de los partidos
+            # supera 8.5). Quien llama pasa la base; el defecto no cambia nada.
             od_pre = real_odds.get(f"{away} @ {home}", {})
-            linea_total = float(od_pre.get("total_line") or 8.5)
+            linea_total = float(od_pre.get("total_line") or linea_por_defecto)
 
             _b, markets, _scores = RankingEngine.evaluate_all_markets(
                 {"home_team": home, "away_team": away}, model_home,
@@ -251,14 +255,15 @@ def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport
     return bets
 
 
-def get_analyzed_bets(fetcher=None, con_cuotas_reales=True, con_demo=True, odds_sport="baseball_mlb"):
+def get_analyzed_bets(fetcher=None, con_cuotas_reales=True, con_demo=True, odds_sport="baseball_mlb",
+                      linea_por_defecto=8.5):
     """Genera y ordena los picks del motor multi-agente.
 
     Fuente de datos: agenda REAL de la MLB del día (vía _build_bets_from_real_games).
     Si no hay conexión, usa el set de ejemplo fijo (_demo_bets). La lógica de
     ordenamiento, stake, tag y aprobación del Chief Tipster NO cambia.
     """
-    raw_bets = _build_bets_from_real_games(fetcher, con_cuotas_reales, odds_sport)
+    raw_bets = _build_bets_from_real_games(fetcher, con_cuotas_reales, odds_sport, linea_por_defecto)
     if not raw_bets and con_demo:
         raw_bets = _demo_bets()
     if not raw_bets:

@@ -16,6 +16,14 @@ def _hoy() -> str:
     return (datetime.now(_TZ) if _TZ else datetime.now()).strftime("%Y-%m-%d")
 
 
+# Abridor "promedio" que se usa cuando el partido no tiene lanzador anunciado.
+# Estos numeros estan calibrados para MLB (ERA real de liga 4.21, WHIP 1.31) y
+# por eso NO se tocan. En otra liga son un dato equivocado: aplicarlos a la LMB
+# (ERA de liga 5.08) hacia que el modelo esperara casi una carrera menos por
+# partido de las que se anotan. Cada liga pasa el suyo por `stats_genericas`.
+GENERICO_MLB = {"era": 4.15, "xera": 4.10, "whip": 1.28, "k_pct": 0.22, "bb_pct": 0.08}
+
+
 class MLBDataFetcher:
     """Lector de la MLB Stats API. Por defecto trae MLB (sportId=1); con otros
     parametros sirve para ligas como la LMB (sportId=23, leagueId=125), que viven
@@ -23,9 +31,11 @@ class MLBDataFetcher:
 
     BASE_URL = "https://statsapi.mlb.com/api/v1"
 
-    def __init__(self, sport_id: int = 1, league_id: int = None):
+    def __init__(self, sport_id: int = 1, league_id: int = None, stats_genericas: dict = None):
         self.sport_id = sport_id
         self.league_id = league_id
+        # Sin argumento se conserva el generico de MLB de siempre.
+        self.stats_genericas = dict(stats_genericas or GENERICO_MLB)
 
     @property
     def _liga(self) -> str:
@@ -133,7 +143,7 @@ class MLBDataFetcher:
         Para MLB (sportId=1) el resultado es idéntico al de antes.
         """
         if not pitcher_id:
-            return {"era": 4.15, "xera": 4.10, "whip": 1.28, "k_pct": 0.22, "bb_pct": 0.08}
+            return dict(self.stats_genericas)
         try:
             temporada = _hoy()[:4]
             url = (f"{self.BASE_URL}/people/{pitcher_id}?hydrate=stats(group=[pitching],"
@@ -150,7 +160,7 @@ class MLBDataFetcher:
                 "bb_pct": 0.07
             }
         except Exception:
-            return {"era": 4.15, "xera": 4.10, "whip": 1.28, "k_pct": 0.22, "bb_pct": 0.08}
+            return dict(self.stats_genericas)
 
     def _get_fallback_games(self) -> list:
         return [

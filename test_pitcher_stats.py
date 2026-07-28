@@ -62,6 +62,42 @@ def test_sin_id_usa_el_generico():
     assert MLBDataFetcher(sport_id=23).get_pitcher_stats(0) == GENERICO
 
 
+# --- el genérico y la línea deben ser de la liga, no de MLB ------------------
+
+def test_mlb_conserva_sus_constantes():
+    """Regla del proyecto: sin argumentos, MLB se comporta EXACTAMENTE igual."""
+    assert MLBDataFetcher().get_pitcher_stats(0) == GENERICO
+    assert mlb_api.GENERICO_MLB == GENERICO
+
+
+def test_cada_liga_puede_traer_su_propio_generico():
+    """La LMB tiene ERA de liga 5.08; con el 4.15 de MLB el modelo esperaba
+    9.49 carreras donde se anotan 10.34."""
+    propio = {"era": 5.08, "xera": 4.83, "whip": 1.51, "k_pct": 0.22, "bb_pct": 0.08}
+    f = MLBDataFetcher(sport_id=23, league_id=125, stats_genericas=propio)
+    assert f.get_pitcher_stats(0) == propio
+    assert f.get_pitcher_stats(0) != GENERICO
+
+
+def test_el_generico_no_se_comparte_entre_fetchers():
+    """Un dict mutable compartido contaminaría una liga con la otra."""
+    f = MLBDataFetcher(sport_id=23, stats_genericas={"era": 5.08, "xera": 4.83,
+                                                    "whip": 1.51, "k_pct": 0.22, "bb_pct": 0.08})
+    f.get_pitcher_stats(0)["era"] = 99.0
+    assert f.get_pitcher_stats(0)["era"] == 5.08, "devolvió el dict interno, no una copia"
+    assert MLBDataFetcher().get_pitcher_stats(0) == GENERICO
+
+
+def test_la_linea_por_defecto_sigue_siendo_8_5():
+    """El 8.5 histórico se conserva salvo que quien llame pase otro valor:
+    así MLB no cambia aunque la firma sí."""
+    import inspect
+
+    import main
+    for fn in (main.get_analyzed_bets, main._build_bets_from_real_games):
+        assert inspect.signature(fn).parameters["linea_por_defecto"].default == 8.5
+
+
 def test_la_lmb_recibe_stats_reales():
     """Contra la API de verdad. Si no hay red o jornada, no falla."""
     f = MLBDataFetcher(sport_id=23, league_id=125)

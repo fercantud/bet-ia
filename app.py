@@ -64,6 +64,10 @@ LIGAS = {
         "cuotas_reales": True,
         "odds_sport": "baseball_kbo",
         "logo_id": None,                       # sin escudos en esta fuente
+        # Linea a usar si la casa no publica una. Fijada a mano porque MyKBO no
+        # da una serie historica barata: medida sobre 51 partidos finalizados
+        # (13-28 jul 2026), mediana 10.0 y 62.7% por encima de 8.5.
+        "linea_base": 10.0,
         # Corea juega de madrugada en hora Central: la jornada util es la del
         # dia siguiente. Con esto, el 27 se muestran los partidos del 28.
         "offset_dias": 1,
@@ -84,12 +88,47 @@ def fecha_jornada(clave=None):
     return (now_local() + timedelta(days=cfg.get("offset_dias", 0))).strftime("%Y-%m-%d")
 
 
+@st.cache_data(ttl=86400)
+def stats_genericas_liga(clave):
+    """Abridor 'promedio' de la liga, para partidos sin lanzador anunciado.
+
+    El generico de siempre (ERA 4.15) esta calibrado para MLB, cuya ERA real de
+    liga es 4.21. En la LMB, con ERA de liga 5.08, ese numero hacia que el modelo
+    esperara 9.49 carreras por partido cuando la liga anota 10.34: casi una
+    carrera menos, y en la mitad de los partidos porque los abridores rara vez
+    se anuncian.
+
+    MLB conserva sus constantes exactas (regla del proyecto: no se toca).
+    """
+    cfg = LIGAS[clave]
+    if clave == "MLB" or cfg.get("fuente") != "mlb":
+        return None                            # None => el fetcher usa el generico de MLB
+    try:
+        liga = f"&leagueId={cfg['league_id']}" if cfg.get("league_id") else ""
+        url = (f"https://statsapi.mlb.com/api/v1/teams/stats?stats=season&group=pitching"
+               f"&sportId={cfg['sport_id']}{liga}&season={now_local().year}")
+        splits = requests.get(url, timeout=15).json().get("stats", [{}])[0].get("splits", [])
+        eras = [float(s["stat"]["era"]) for s in splits
+                if str(s.get("stat", {}).get("era", "")).replace(".", "").isdigit()]
+        whips = [float(s["stat"]["whip"]) for s in splits
+                 if str(s.get("stat", {}).get("whip", "")).replace(".", "").isdigit()]
+        if len(eras) < 4:                      # muestra pobre: mejor el generico de siempre
+            return None
+        era = round(sum(eras) / len(eras), 2)
+        return {"era": era, "xera": round(era * 0.95, 2),
+                "whip": round(sum(whips) / len(whips), 2) if whips else 1.28,
+                "k_pct": 0.22, "bb_pct": 0.08}
+    except Exception:
+        return None
+
+
 def _crear_fetcher(clave):
     cfg = LIGAS[clave]
     if cfg.get("fuente") == "mykbo":
         from kbo_api import KBODataFetcher
         return KBODataFetcher(fecha=fecha_jornada(clave))
-    return MLBDataFetcher(sport_id=cfg["sport_id"], league_id=cfg["league_id"])
+    return MLBDataFetcher(sport_id=cfg["sport_id"], league_id=cfg["league_id"],
+                          stats_genericas=stats_genericas_liga(clave))
 
 
 def fetcher_liga():
@@ -737,6 +776,51 @@ def _analisis_es_de_hoy(bets):
     return coinciden >= max(1, len(bets) // 2)           # al menos la mitad
 
 
+@st.cache_data(ttl=86400)
+def linea_base_liga(clave):
+    """Linea de totales a usar cuando la casa no publica una para el partido.
+
+    El 8.5 de siempre esta calibrado para MLB, donde parte los partidos casi por
+    la mitad (48.5% los supera). Aplicado a una liga mas anotadora convierte
+    cualquier Over en ganador por construccion: en LMB el 59.3% de los partidos
+    supera 8.5, asi que el motor "descubria" valor en los Over que en realidad
+    venia de la linea equivocada.
+
+    Se usa la MEDIANA de carreras totales de los ultimos 28 dias, que es la
+    linea que parte la liga por la mitad. Solo afecta a partidos SIN cuota real:
+    en MLB todos los partidos traen su linea, asi que no cambia nada.
+    """
+    cfg = LIGAS[clave]
+    fijo = cfg.get("linea_base")
+    if fijo:
+        return float(fijo)
+    if cfg.get("fuente") != "mlb":            # otras fuentes: sin serie historica barata
+        return 8.5
+    try:
+        import statistics
+        fin = now_local().date()
+        ini = fin - timedelta(days=28)
+        liga = f"&leagueId={cfg['league_id']}" if cfg.get("league_id") else ""
+        url = (f"https://statsapi.mlb.com/api/v1/schedule?sportId={cfg['sport_id']}{liga}"
+               f"&startDate={ini}&endDate={fin}")
+        datos = requests.get(url, timeout=15).json()
+        totales = []
+        for dia in datos.get("dates", []):
+            for g in dia.get("games", []):
+                if g.get("status", {}).get("abstractGameState") != "Final":
+                    continue
+                eq = g.get("teams", {})
+                a, h = eq.get("away", {}).get("score"), eq.get("home", {}).get("score")
+                if a is not None and h is not None:
+                    totales.append(a + h)
+        if len(totales) < 30:                 # muestra pobre: mejor no inventar
+            return 8.5
+        # A la media linea mas cercana, como las cuotas reales (8.5, 9.0, 9.5...)
+        return round(statistics.median(totales) * 2) / 2
+    except Exception:
+        return 8.5
+
+
 def get_todays_analysis():
     today = fecha_jornada()
     if os.path.exists(ANALYSIS_CACHE):
@@ -759,7 +843,8 @@ def get_todays_analysis():
     bets = get_analyzed_bets(fetcher_liga(),
                              con_cuotas_reales=LIGA["cuotas_reales"],
                              con_demo=(st.session_state.liga == "MLB"),
-                             odds_sport=LIGA.get("odds_sport") or "baseball_mlb")
+                             odds_sport=LIGA.get("odds_sport") or "baseball_mlb",
+                             linea_por_defecto=linea_base_liga(st.session_state.liga))
 
     # SALVAGUARDA: verifica que los picks correspondan a los partidos de HOY.
     # Si la fuente de datos devolviera otra jornada (por ejemplo la de ayer, ya
