@@ -1920,15 +1920,18 @@ def render_resultados():
 def render_rendimiento():
     topbar("Rendimiento", "Analítica del sistema: EV proyectado, edge y resultados", "trophy")
 
-    section_header("Proyección de la jornada de hoy", "Valor esperado y score por pick (salida del motor)")
-    proj = board_df.set_index("PARTIDO")
-    a, b = st.columns(2, gap="large")
-    with a:
-        st.markdown('<p style="font-size:13px;color:rgb(var(--ink2));margin-bottom:4px;">EV por partido</p>', unsafe_allow_html=True)
-        st.bar_chart(proj["EV"])
-    with b:
-        st.markdown('<p style="font-size:13px;color:rgb(var(--ink2));margin-bottom:4px;">Score por partido</p>', unsafe_allow_html=True)
-        st.bar_chart(proj["SCORE"])
+    # La proyeccion solo existe si hay jornada publicada. La analitica historica
+    # de mas abajo no depende de ella y debe verse igual en dias sin partidos.
+    if not board_df.empty:
+        section_header("Proyección de la jornada de hoy", "Valor esperado y score por pick (salida del motor)")
+        proj = board_df.set_index("PARTIDO")
+        a, b = st.columns(2, gap="large")
+        with a:
+            st.markdown('<p style="font-size:13px;color:rgb(var(--ink2));margin-bottom:4px;">EV por partido</p>', unsafe_allow_html=True)
+            st.bar_chart(proj["EV"])
+        with b:
+            st.markdown('<p style="font-size:13px;color:rgb(var(--ink2));margin-bottom:4px;">Score por partido</p>', unsafe_allow_html=True)
+            st.bar_chart(proj["SCORE"])
 
     hist = load_history()
     if hist.empty:
@@ -1964,7 +1967,7 @@ def render_rendimiento():
 # ---------------------------------------------------------------------------
 def _sin_jornada():
     st.info(f"Hoy no hay jornada publicada para **{LIGA['nombre']}**. "
-            "Cambia de liga en la barra lateral o vuelve más tarde.")
+            "El historial sigue disponible en **Resultados** y **Rendimiento**.")
 
 
 ROUTES = {
@@ -1975,7 +1978,13 @@ ROUTES = {
     "Resultados": render_resultados,
     "Rendimiento": render_rendimiento,
 }
-if not sorted_bets:
-    _sin_jornada()
+
+# Paginas que viven del historial guardado, no de la jornada del dia: deben
+# abrirse aunque la liga no tenga partidos publicados hoy.
+HISTORICAS = {"Resultados", "Rendimiento"}
+
+pagina = st.session_state.page
+if sorted_bets or pagina in HISTORICAS:
+    ROUTES.get(pagina, render_dashboard)()
 else:
-    ROUTES.get(st.session_state.page, render_dashboard)()
+    _sin_jornada()
