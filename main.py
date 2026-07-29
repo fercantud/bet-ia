@@ -115,6 +115,14 @@ def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport
     bets = []
 
     for g in games:
+        # Sin los DOS abridores anunciados no se emite pick. Al que falta se le
+        # rellenaba con un lanzador promedio y el modelo lo tomaba por un dato
+        # real: el 29/07 comparo al abridor de Colorado (2.65 xERA) contra ese
+        # relleno y dio Rockies 62% cuando el mercado los tenia en 44%. Todo el
+        # "valor" salia del hueco. El partido vuelve a evaluarse en cuanto se
+        # anuncie el abridor (ver get_todays_analysis en app.py).
+        if not g.get("pitchers_confirmed", True):
+            continue
         try:
             home, away = g["home_team"], g["away_team"]
             hs = fetcher.get_pitcher_stats(g.get("home_pitcher_id", 0))
@@ -266,6 +274,18 @@ def get_analyzed_bets(fetcher=None, con_cuotas_reales=True, con_demo=True, odds_
     raw_bets = _build_bets_from_real_games(fetcher, con_cuotas_reales, odds_sport, linea_por_defecto)
     if not raw_bets and con_demo:
         raw_bets = _demo_bets()
+    if not raw_bets:
+        return []
+    return rank_bets(raw_bets)
+
+
+def rank_bets(raw_bets):
+    """Ordena y etiqueta una lista de picks ya calculados.
+
+    Va aparte de get_analyzed_bets porque el rank depende del conjunto: cuando
+    se anuncia un abridor y se suma su partido a los del dia, hay que renumerar
+    sin volver a calcular los que ya estaban. Los criterios no cambian.
+    """
     if not raw_bets:
         return []
 

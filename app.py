@@ -23,7 +23,7 @@ def now_local():
 import pandas as pd
 import streamlit as st
 
-from main import get_analyzed_bets
+from main import get_analyzed_bets, rank_bets
 from mlb_api import MLBDataFetcher
 
 DB_NAME = "bet_ia_performance.db"          # BD antigua (solo para migrar una vez)
@@ -790,6 +790,17 @@ def linea_base_liga(clave):
         return 8.5
 
 
+@st.cache_data(ttl=600)
+def _partidos_listos(clave, dia):
+    """Partidos del día que YA tienen los dos abridores anunciados."""
+    try:
+        juegos = _crear_fetcher(clave).get_todays_games(date=dia)
+    except Exception:
+        return []
+    return [f'{g["away_team"]} @ {g["home_team"]}'
+            for g in juegos if g.get("pitchers_confirmed")]
+
+
 def get_todays_analysis():
     today = fecha_jornada()
     if os.path.exists(ANALYSIS_CACHE):
@@ -797,23 +808,19 @@ def get_todays_analysis():
             with open(ANALYSIS_CACHE, encoding="utf-8") as f:
                 cached = json.load(f)
             if cached.get("day") == today and cached.get("bets"):
-                return cached["bets"]  # mismos picks del día, estables
+                guardados = {b["matchup"] for b in cached["bets"]}
+                # Los partidos sin abridor anunciado no generan pick. Si alguno
+                # ya lo tiene, se analiza AHORA y se suma; los picks que ya
+                # estaban no se recalculan, para que no cambien despues de que
+                # el usuario los haya visto o apostado.
+                nuevos = [m for m in _partidos_listos(st.session_state.liga, today)
+                          if m not in guardados]
+                if not nuevos:
+                    return cached["bets"]       # mismos picks del día, estables
+                return _completar_analisis(cached["bets"], nuevos, today)
         except Exception:
             pass
-    # Semilla fija por fecha: el motor usa simulacion Monte Carlo (aleatoria), asi que
-    # dos equipos distintos daban picks distintos el mismo dia. Con esto, el mismo dia
-    # produce SIEMPRE el mismo resultado. No cambia ninguna formula: solo hace que el
-    # sorteo aleatorio sea reproducible.
-    try:
-        import numpy as _np
-        _np.random.seed(int(today.replace("-", "")))
-    except Exception:
-        pass
-    bets = get_analyzed_bets(fetcher_liga(),
-                             con_cuotas_reales=LIGA["cuotas_reales"],
-                             con_demo=(st.session_state.liga == "MLB"),
-                             odds_sport=LIGA.get("odds_sport") or "baseball_mlb",
-                             linea_por_defecto=linea_base_liga(st.session_state.liga))
+    bets = _correr_motor(today)
 
     # SALVAGUARDA: verifica que los picks correspondan a los partidos de HOY.
     # Si la fuente de datos devolviera otra jornada (por ejemplo la de ayer, ya
@@ -826,11 +833,51 @@ def get_todays_analysis():
         )
         return []
 
+    _guardar_analisis(bets, today)
+    return bets
+
+
+def _correr_motor(dia):
+    """Una corrida del motor para la jornada indicada.
+
+    Semilla fija por fecha: el motor usa simulacion Monte Carlo (aleatoria), asi
+    que dos equipos distintos daban picks distintos el mismo dia. Con esto, el
+    mismo dia produce SIEMPRE el mismo resultado. No cambia ninguna formula:
+    solo hace que el sorteo aleatorio sea reproducible.
+    """
     try:
-        with open(ANALYSIS_CACHE, "w", encoding="utf-8") as f:
-            json.dump({"day": today, "bets": bets}, f, ensure_ascii=False)
+        import numpy as _np
+        _np.random.seed(int(dia.replace("-", "")))
     except Exception:
         pass
+    return get_analyzed_bets(fetcher_liga(),
+                             con_cuotas_reales=LIGA["cuotas_reales"],
+                             con_demo=(st.session_state.liga == "MLB"),
+                             odds_sport=LIGA.get("odds_sport") or "baseball_mlb",
+                             linea_por_defecto=linea_base_liga(st.session_state.liga))
+
+
+def _guardar_analisis(bets, dia):
+    try:
+        with open(ANALYSIS_CACHE, "w", encoding="utf-8") as f:
+            json.dump({"day": dia, "bets": bets}, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def _completar_analisis(guardados, nuevos, dia):
+    """Suma al analisis del dia los partidos cuyo abridor acaba de anunciarse.
+
+    Los picks que ya estaban se conservan tal cual: solo se renumera el rank,
+    que depende del conjunto. Asi un pick no cambia de probabilidad ni de cuota
+    despues de que el usuario lo vio.
+    """
+    por_partido = {b["matchup"]: b for b in _correr_motor(dia)}
+    sumados = [por_partido[m] for m in nuevos if m in por_partido]
+    if not sumados:
+        return guardados                     # anunciado pero aun sin cuotas
+    bets = rank_bets(guardados + sumados)
+    _guardar_analisis(bets, dia)
     return bets
 
 
