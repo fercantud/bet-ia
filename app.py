@@ -359,6 +359,8 @@ svg{ display:inline-block; vertical-align:middle; }
 .rt-nologo{ width:20px; text-align:center; display:inline-block; }
 .rt-game span.nm{ color:rgb(var(--ink)); font-weight:500; }
 .rt-sel{ font-weight:600; color:rgb(var(--ink)); }
+/* Cobrada por pago anticipado (ventaja de 5+ carreras) */
+.rt-ant{ margin-left:5px; font-size:12px; cursor:help; opacity:.85; }
 .rt-pl.pos{ color:rgb(var(--save)); font-weight:700; }
 .rt-pl.neg{ color:rgb(var(--fare)); font-weight:700; }
 .rt-pl.zero{ color:rgb(var(--ink2)); }
@@ -1024,17 +1026,74 @@ def find_final(matchup, games):
     return None
 
 
+def buscar_partido(matchup, games):
+    """El partido del enfrentamiento en CUALQUIER estado (en vivo incluido).
+    Con dobles carteleras se prefiere el que ya tiene accion."""
+    candidatos = [g for g in games
+                  if _team_match(g["away_team"], matchup)
+                  and _team_match(g["home_team"], matchup)]
+    if not candidatos:
+        return None
+    return next((g for g in candidatos if g["is_live"] or g["is_final"]), candidatos[0])
+
+
+VENTAJA_PAGO_ANTICIPADO = 5          # carreras
+
+
+def ventaja_maxima(g):
+    """Mayor ventaja que llego a tener cada equipo -> (visitante, local).
+
+    Se reconstruye medio inning a medio inning desde las carreras por entrada,
+    no desde el marcador final. Asi se detecta la ventaja aunque la app no
+    estuviera abierta en ese momento, y tambien en partidos ya terminados.
+    """
+    visitante = local = 0
+    mejor_v = mejor_l = 0
+    for carreras_v, carreras_l in (g.get("innings_runs") or []):
+        visitante += carreras_v                      # cierre de la parte alta
+        mejor_v, mejor_l = max(mejor_v, visitante - local), max(mejor_l, local - visitante)
+        local += carreras_l                          # cierre de la parte baja
+        mejor_v, mejor_l = max(mejor_v, visitante - local), max(mejor_l, local - visitante)
+    # Marcador actual, por si la fuente no trae desglose por entradas
+    v, l = g.get("away_score", 0) or 0, g.get("home_score", 0) or 0
+    return max(mejor_v, v - l), max(mejor_l, l - v)
+
+
+def cobro_anticipado(selection, g):
+    """True si el equipo elegido llego a ir 5+ carreras arriba en algun momento.
+
+    Es la promocion de pago anticipado: la casa liquida el moneyline como
+    ganado en cuanto se alcanza esa ventaja, aunque el partido se voltee.
+    """
+    mejor_v, mejor_l = ventaja_maxima(g)
+    if _team_match(selection, g["away_team"]):
+        return mejor_v >= VENTAJA_PAGO_ANTICIPADO
+    if _team_match(selection, g["home_team"]):
+        return mejor_l >= VENTAJA_PAGO_ANTICIPADO
+    return False
+
+
 def settle_pick(matchup, selection, market, games):
     """Determina WON/LOST comparando la selección contra el resultado real.
     Devuelve None si el partido no ha finalizado o no se puede decidir."""
     import re
+    sel = selection.lower()
+    mkt = (market or "").upper()
+    es_total = mkt == "TOTAL" or "under" in sel or "over" in sel
+    es_f5 = mkt == "F5" or "f5" in sel or "first 5" in sel
+
+    # PAGO ANTICIPADO (solo moneyline): se comprueba ANTES de exigir que el
+    # partido haya terminado, para marcarlo en cuanto ocurre la ventaja.
+    if not es_total and not es_f5:
+        g = buscar_partido(matchup, games)
+        if g and cobro_anticipado(selection, g):
+            return "WON"
+
     g = find_final(matchup, games)
     if not g:
         return None
-    sel = selection.lower()
-    mkt = (market or "").upper()
 
-    if mkt == "TOTAL" or "under" in sel or "over" in sel:
+    if es_total:
         m = re.search(r"(\d+(?:\.\d+)?)", selection)
         line = float(m.group(1)) if m else 8.5
         total = g["away_score"] + g["home_score"]
@@ -1044,7 +1103,7 @@ def settle_pick(matchup, selection, market, games):
             return "WON" if total < line else "LOST"
         return "WON" if total > line else "LOST"   # over
 
-    if mkt == "F5" or "f5" in sel or "first 5" in sel:
+    if es_f5:
         if g["innings_played"] < 5:
             return None
         af5, hf5 = g["away_f5"], g["home_f5"]
@@ -1100,6 +1159,11 @@ def auto_settle_db(games):
             odds = float(b.get("odds", 0) or 0)
             b["result"] = r
             b["profit_loss"] = frac * (odds - 1) if r == "WON" else (-frac if r == "LOST" else 0.0)
+            # Deja constancia de si se cobro por la ventaja de 5 carreras
+            if r == "WON" and (b.get("market") or "").upper() not in ("TOTAL", "F5"):
+                g = buscar_partido(b["matchup"], partidos)
+                if g and cobro_anticipado(b["selection"], g):
+                    b["pago_anticipado"] = True
             changed = True
     if changed:
         _write_history_file(bets)
@@ -1957,6 +2021,11 @@ def render_resultados():
         "Beneficio": en["pl_units"],
         "Saldo": en["saldo"],
     })
+    # Marca las ganadas por pago anticipado: sin esto, una apuesta cobrada con
+    # 5 carreras de ventaja que luego se voltea aparece como Ganada junto a un
+    # marcador perdido, y no hay forma de saber por que.
+    det["Anticipado"] = (en["pago_anticipado"].fillna(False).astype(bool)
+                         if "pago_anticipado" in en.columns else False)
 
     page_section("Detalle por apuesta", "Cada pick con su beneficio y saldo acumulado")
 
@@ -2033,7 +2102,10 @@ def render_resultados():
                 f'<td class="rt-sel">{r["Selección"]}</td>'
                 f'<td class="num">{r["Cuota"]:.2f}</td>'
                 f'<td class="num">{r["Stake %"]:.2f}%</td>'
-                f'<td>{badge(r["Resultado"], tone.get(r["Resultado"], "neutral"))}</td>'
+                f'<td>{badge(r["Resultado"], tone.get(r["Resultado"], "neutral"))}'
+                + ('<span class="rt-ant" title="Pago anticipado: el equipo llegó a ir '
+                   '5 o más carreras arriba">⚡</span>' if r.get("Anticipado") else "")
+                + '</td>'
                 f'<td class="num rt-pl {cls}">{pl:+,.2f}</td>'
                 f'<td class="num">{mxn(float(r["Saldo"]))}</td></tr>'
             )

@@ -111,6 +111,12 @@ class MLBDataFetcher:
                     "away_f5": away_f5,
                     "home_f5": home_f5,
                     "innings_played": len(innings),
+                    # Carreras por entrada. Permiten reconstruir el marcador a lo
+                    # largo del partido, no solo el final: con eso se detecta si
+                    # un equipo llego a ir 5 o mas arriba (pago anticipado).
+                    "innings_runs": [((i.get('away', {}).get('runs') or 0),
+                                      (i.get('home', {}).get('runs') or 0))
+                                     for i in innings],
                     "away_score": away.get('score', ls_teams.get('away', {}).get('runs', 0)) or 0,
                     "home_score": home.get('score', ls_teams.get('home', {}).get('runs', 0)) or 0,
                     "away_hits": ls_teams.get('away', {}).get('hits', 0),
