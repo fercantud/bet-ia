@@ -9,8 +9,8 @@ import requests
 
 class OddsDataFetcher:
     def __init__(self, api_key: str = None, sport: str = "baseball_mlb"):
-        # `sport` permite reutilizar el mismo lector para otras ligas
-        # (baseball_kbo, etc.). Por defecto sigue siendo MLB.
+        # `sport` permite reutilizar el mismo lector para otras ligas que
+        # The Odds API publique. Por defecto sigue siendo MLB.
         self.api_key = api_key or os.getenv("ODDS_API_KEY", "")
         self.sport = sport
         self.base_url = f"https://api.the-odds-api.com/v4/sports/{sport}/odds"
