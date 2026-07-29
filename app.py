@@ -511,12 +511,12 @@ hr{ border-color:rgb(var(--line)); }
 .lv-status svg{ opacity:.6; }
 .lv-status .lv-dot{ margin:0 2px; opacity:.5; }
 .lv-tablewrap{ border:1px solid rgb(var(--line)); border-radius:12px; overflow-x:auto; }
-.lv-cols{ grid-template-columns:78px 104px minmax(170px,1fr) 84px 156px 52px 52px 72px 112px 62px; }
+.lv-cols{ grid-template-columns:78px 104px minmax(300px,1.5fr) 84px 156px 52px 52px 72px 112px 62px; }
 .lv-head{ display:grid; column-gap:8px; padding:10px 12px; background:rgb(var(--surface2));
     color:rgb(var(--ink2)); font-size:10.5px; font-weight:700; letter-spacing:.07em;
     text-transform:uppercase; border-bottom:1px solid rgb(var(--line)); white-space:nowrap; }
 .lv-head small{ text-transform:none; font-weight:500; font-size:9.5px; opacity:.7; margin-left:3px; }
-.lv-row{ min-width:1000px; }
+.lv-row{ min-width:1130px; }
 .lv-sum{ display:grid; column-gap:8px; align-items:center; padding:9px 12px; cursor:pointer;
     list-style:none; border-bottom:1px solid rgb(var(--line)); transition:background .12s ease; }
 .lv-sum::-webkit-details-marker{ display:none; }
@@ -537,6 +537,15 @@ hr{ border-color:rgb(var(--line)); }
 .lv-sum .teams img{ width:20px; height:20px; object-fit:contain; flex-shrink:0; }
 .lv-sum .teams .t{ font-weight:600; color:rgb(var(--ink)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .lv-sum .teams .vs{ color:rgb(var(--ink2)); font-size:11.5px; margin:0 2px; flex-shrink:0; }
+/* Abridores bajo el partido: 'Pitchers: Gusto R. [HOU] (0-2)' */
+.lv-pit{ display:flex; align-items:center; flex-wrap:wrap; gap:0 8px; margin-top:3px;
+    font-size:10.5px; line-height:1.5; color:rgb(var(--ink2)); font-weight:500; }
+.lv-pit em{ font-style:normal; opacity:.65; }
+.lv-pit .pit{ white-space:nowrap; }
+.lv-pit .pit+.pit::before{ content:'·'; margin-right:7px; opacity:.45; }
+.lv-pit i{ font-style:normal; margin-left:4px; padding:0 3px; border-radius:3px;
+    background:rgb(var(--ink2)/0.1); font-size:9.5px; letter-spacing:.02em; }
+.lv-pit b{ font-weight:700; margin-left:4px; color:rgb(var(--ink)); font-variant-numeric:tabular-nums; }
 .lv-marc{ font-variant-numeric:tabular-nums; font-weight:800; font-size:14px; letter-spacing:-.01em; color:rgb(var(--ink2)); }
 .lv-marc i{ font-style:normal; opacity:.45; margin:0 1px; }
 .lv-marc.live{ color:rgb(var(--accent)); }
@@ -1300,6 +1309,62 @@ def parlay_card_html(p, games):
     )
 
 
+@st.cache_data(ttl=1800)
+def records_abridores(clave, ids):
+    """Récord ganados-perdidos de los abridores, en UNA sola llamada.
+
+    `ids` llega como tupla para que Streamlit pueda cachearlo. El endpoint
+    /people acepta hasta la jornada entera de golpe (31 lanzadores en una
+    peticion), asi que no se consulta uno por uno.
+    """
+    cfg = LIGAS[clave]
+    ids = tuple(dict.fromkeys(i for i in ids if i))
+    if not ids:
+        return {}
+    try:
+        url = (f"https://statsapi.mlb.com/api/v1/people?personIds={','.join(map(str, ids))}"
+               f"&hydrate=stats(group=[pitching],type=[season],"
+               f"sportId={cfg['sport_id']},season={now_local().year})")
+        gente = requests.get(url, timeout=15).json().get("people", [])
+    except Exception:
+        return {}
+    salida = {}
+    for p in gente:
+        try:
+            s = p["stats"][0]["splits"][0]["stat"]
+            salida[p["id"]] = f'{int(s.get("wins", 0))}-{int(s.get("losses", 0))}'
+        except Exception:
+            continue                      # abridor sin temporada registrada
+    return salida
+
+
+def abridor_corto(nombre):
+    """'Jesús Luzardo' -> 'Luzardo J.', como en los marcadores deportivos."""
+    partes = [w for w in str(nombre).split() if w]
+    if len(partes) < 2:
+        return partes[0] if partes else ""
+    return f"{partes[-1]} {partes[0][0]}."
+
+
+def pitchers_html(g, records):
+    """Linea de abridores bajo el partido: 'Gusto R. [MIA] (0-2)'."""
+    trozos = []
+    for lado in ("away", "home"):
+        nombre = g.get(f"{lado}_pitcher")
+        if not nombre:
+            continue
+        rec = records.get(g.get(f"{lado}_pitcher_id"))
+        abbr = g.get(f"{lado}_abbr")
+        trozos.append(
+            f'<span class="pit">{abridor_corto(nombre)}'
+            + (f'<i>{abbr}</i>' if abbr else "")
+            + (f'<b>({rec})</b>' if rec else "")
+            + '</span>')
+    if not trozos:
+        return ""
+    return f'<small class="lv-pit"><em>Pitchers:</em>{"".join(trozos)}</small>'
+
+
 def build_matchday_rows(games, bets):
     """Une la agenda real y los picks en UNA fila por partido (sin duplicados).
     Orden: En vivo primero, luego próximos por hora, y al final los finalizados."""
@@ -1553,7 +1618,7 @@ def live_detail_html(r):
     )
 
 
-def live_table_row(r):
+def live_table_row(r, records=None):
     """Fila expandible: Hora/Estado/Partido/Marcador/Pick IA/Prob/Cuota/EV/Inicio/Detalle."""
     g, bet = r["game"], r["bet"]
     estado_badge = {
@@ -1599,7 +1664,8 @@ def live_table_row(r):
         f'<span class="c-est">{estado_badge}</span>'
         f'<span class="c-part"><span class="teams">{team_logo(g["away_id"], g["away_team"])}'
         f'<span class="t">{g["away_team"]}</span><span class="vs">vs</span>'
-        f'{team_logo(g["home_id"], g["home_team"])}<span class="t">{g["home_team"]}</span></span></span>'
+        f'{team_logo(g["home_id"], g["home_team"])}<span class="t">{g["home_team"]}</span></span>'
+        f'{pitchers_html(g, records or {})}</span>'
         f'<span class="c-marc">{marcador}<small>{marc_sub}</small></span>'
         f'<span class="c-pick">{pick_html}</span>'
         f'<span class="c-prob num">{prob_td}</span>'
@@ -1681,6 +1747,11 @@ def render_en_vivo():
     mercados_sel = st.session_state.get("lv_mercados") or ["ML", "TOTAL", "F5"]
     md_rows = [r for r in md_rows if not r["bet"] or r["bet"]["market"] in mercados_sel]
 
+    # Records de los abridores de TODA la jornada de una sola vez (no por fila)
+    ids = tuple(g[k] for g in live for k in ("away_pitcher_id", "home_pitcher_id")
+                if g.get(k))
+    records = records_abridores(st.session_state.liga, ids)
+
     st.markdown(
         '<div class="lv-tablewrap">'
         '<div class="lv-head lv-cols">'
@@ -1689,7 +1760,7 @@ def render_en_vivo():
         '<span class="c-pick">Pick IA</span><span class="c-prob num">Prob.</span>'
         '<span class="c-cuota num">Cuota</span><span class="c-ev num">EV</span>'
         '<span class="c-inicio">Inicio</span><span class="c-det">Detalle</span></div>'
-        + ("".join(live_table_row(r) for r in md_rows) if md_rows else
+        + ("".join(live_table_row(r, records) for r in md_rows) if md_rows else
            '<p style="padding:18px;color:rgb(var(--ink2));margin:0;">Sin partidos para este filtro.</p>')
         + '</div>',
         unsafe_allow_html=True)

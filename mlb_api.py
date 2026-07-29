@@ -130,6 +130,12 @@ class MLBDataFetcher:
                     "start_utc": g.get('gameDate', ''),
                     "away_pitcher": away.get('probablePitcher', {}).get('fullName', ''),
                     "home_pitcher": home.get('probablePitcher', {}).get('fullName', ''),
+                    # Id del abridor y abreviatura del equipo: la vista En vivo los
+                    # usa para mostrar "Luzardo J. [PHI] (9-5)".
+                    "away_pitcher_id": away.get('probablePitcher', {}).get('id', 0),
+                    "home_pitcher_id": home.get('probablePitcher', {}).get('id', 0),
+                    "away_abbr": away.get('team', {}).get('abbreviation', ''),
+                    "home_abbr": home.get('team', {}).get('abbreviation', ''),
                 })
             return games
         except Exception:
