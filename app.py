@@ -395,67 +395,6 @@ svg{ display:inline-block; vertical-align:middle; }
 .pl-foot b{ font-size:14px; font-weight:800; color:rgb(var(--ink)); font-variant-numeric:tabular-nums; line-height:1.25; }
 .pl-foot b.pos{ color:rgb(var(--save)); } .pl-foot b.neg{ color:rgb(var(--fare)); }
 
-/* ---- Tabla unificada de la jornada (estilo Bloomberg/ESPN) ---- */
-/* sin alto maximo: se ven todas las filas, sin scroll vertical interno */
-/* mismo cierre que la tabla de Resultados: borde sutil y esquinas redondeadas */
-.fh-tablewrap{ overflow-x:auto; border:1px solid rgb(var(--line)); border-radius:12px; }
-.fh-mtable{ width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
-.fh-mtable thead th{ position:sticky; top:0; z-index:2; background:rgb(var(--surface2));
-    color:rgb(var(--ink2)); font-size:10.5px; font-weight:700; letter-spacing:.07em;
-    text-transform:uppercase; text-align:left; padding:10px 12px; white-space:nowrap;
-    border-bottom:1px solid rgb(var(--line)); }
-.fh-mtable tbody td{ padding:9px 12px; border-bottom:1px solid rgb(var(--line));
-    vertical-align:middle; height:44px; }
-.fh-mtable tbody tr{ transition:background .12s ease; }
-.fh-mtable tbody tr:hover{ background:rgb(var(--surface2)/0.55); }
-.fh-mtable tbody tr:last-child td{ border-bottom:none; }
-/* Fila completa coloreada según el resultado del pick */
-.fh-mtable tbody tr.r-won  td{ background:rgb(var(--save)/0.13); }
-.fh-mtable tbody tr.r-lost td{ background:rgb(var(--fare)/0.11); }
-.fh-mtable tbody tr.r-push td{ background:rgb(var(--warn)/0.13); }
-.fh-mtable tbody tr.r-won:hover  td{ background:rgb(var(--save)/0.20); }
-.fh-mtable tbody tr.r-lost:hover td{ background:rgb(var(--fare)/0.18); }
-.fh-mtable tbody tr.r-push:hover td{ background:rgb(var(--warn)/0.20); }
-.fh-mtable tbody tr.r-won  .pick-nm{ color:rgb(var(--save)); }
-.fh-mtable tbody tr.r-lost .pick-nm{ color:rgb(var(--fare)); }
-.fh-mtable .num{ text-align:right; font-variant-numeric:tabular-nums; font-weight:700; white-space:nowrap; }
-.fh-mtable .c-hora{ width:100px; font-variant-numeric:tabular-nums; font-weight:700;
-    color:rgb(var(--ink2)); white-space:nowrap; }
-.fh-mtable tr.live .c-hora{ color:rgb(var(--accent)); }
-.fh-mtable .c-est{ width:170px; white-space:nowrap; }
-/* marcador en vivo / final dentro de la columna Estado */
-.fh-mtable .sc{ display:inline-block; margin-left:7px; font-variant-numeric:tabular-nums;
-    font-weight:800; font-size:13px; letter-spacing:-.01em; vertical-align:middle; }
-.fh-mtable .sc i{ font-style:normal; opacity:.45; margin:0 1px; }
-.fh-mtable .sc.live{ color:rgb(var(--accent)); }
-.fh-mtable .sc.final{ color:rgb(var(--ink)); }
-/* color del marcador segun como va el pick en vivo */
-.fh-mtable .sc.l-win{ color:rgb(var(--save)); }
-.fh-mtable .sc.l-lose{ color:rgb(var(--fare)); }
-.fh-mtable .sc.l-tie{ color:rgb(var(--ink2)); }
-/* tinte MUY leve de la fila mientras el partido esta en curso (resultado provisional) */
-.fh-mtable tbody tr.v-win  td{ background:rgb(var(--save)/0.06); }
-.fh-mtable tbody tr.v-lose td{ background:rgb(var(--fare)/0.055); }
-.fh-mtable tbody tr.v-tie  td{ background:rgb(var(--ink2)/0.055); }
-.fh-mtable tbody tr.v-win:hover  td{ background:rgb(var(--save)/0.12); }
-.fh-mtable tbody tr.v-lose:hover td{ background:rgb(var(--fare)/0.11); }
-.fh-mtable tbody tr.v-tie:hover  td{ background:rgb(var(--ink2)/0.11); }
-.fh-mtable .c-res{ width:44px; text-align:center; }
-.fh-mtable .teams{ display:flex; align-items:center; gap:7px; min-width:0; }
-.fh-mtable .teams img{ width:20px; height:20px; object-fit:contain; flex-shrink:0; }
-.fh-mtable .teams .t{ font-weight:600; color:rgb(var(--ink)); white-space:nowrap; }
-.fh-mtable .teams .vs{ color:rgb(var(--ink2)); font-size:11.5px; margin:0 2px; }
-.fh-mtable .pick-nm{ font-weight:600; color:rgb(var(--ink)); }
-.fh-mtable .ev.pos{ color:rgb(var(--save)); } .fh-mtable .ev.neg{ color:rgb(var(--fare)); }
-.fh-mtable .prob{ color:rgb(var(--ink)); font-weight:700; }
-.fh-mtable .vacio{ color:rgb(var(--ink2)); opacity:.5; }
-.fh-mtable .fh-tres{ margin:0 auto; }
-.fh-mtable .fh-tres.empty{ background:transparent; border:1px dashed rgb(var(--line)); }
-@media (max-width:820px){
-    .fh-mtable .c-est{ width:auto; }
-    .fh-mtable .teams .t{ max-width:96px; overflow:hidden; text-overflow:ellipsis; }
-}
-
 /* topbar acciones */
 .fh-top-actions{ display:flex; align-items:center; gap:10px; }
 .fh-ic-btn{ position:relative; width:38px; height:38px; border-radius:10px; border:1px solid rgb(var(--dkline));
@@ -1389,63 +1328,11 @@ def build_matchday_rows(games, bets):
     return rows
 
 
-def match_table_row(r):
-    """Renderiza una fila de la tabla unificada de la jornada."""
-    g, bet = r["game"], r["bet"]
-    estado_badge = {
-        "live": badge("EN VIVO", "live"),
-        "prev": badge("PRÓXIMO", "blue"),
-        "final": badge("FINALIZADO", "neutral"),
-    }[r["estado"]]
-    # Marcador en vivo / final (mismo orden que la columna Partido: visitante-local).
-    # En vivo se tine segun como va el pick: verde=ganando, rojo=perdiendo, gris=empate.
-    vivo = live_pick_status(bet, g)
-    if r["estado"] in ("live", "final"):
-        sc_cls = f'sc {r["estado"]}' + (f' l-{vivo}' if vivo else '')
-        estado_badge += (f'<span class="{sc_cls}">'
-                         f'{g["away_score"]}<i>-</i>{g["home_score"]}</span>')
-
-    res_map = {"WON": ("won", "✓"), "LOST": ("lost", "✗"), "PUSH": ("push", "=")}
-    if bet is None:
-        dot = '<span class="fh-tres empty"></span>'
-    else:
-        cls, ico = res_map.get(r["result"], ("pend", "•"))
-        dot = f'<span class="fh-tres {cls}">{ico}</span>'
-
-    if bet:
-        ev_cls = "pos" if bet["ev"] > 0 else "neg"
-        pick_td = f'<span class="pick-nm">{r["pick"]}</span>'
-        prob_td = f'<span class="prob">{bet["prob_model"]:.0%}</span>'
-        odds_td = f'{bet["odds"]:.2f}'
-        ev_td = f'<span class="ev {ev_cls}">{bet["ev"]:+.1%}</span>'
-    else:
-        pick_td = prob_td = odds_td = ev_td = '<span class="vacio">—</span>'
-
-    res_cls = {"WON": " r-won", "LOST": " r-lost", "PUSH": " r-push"}.get(r["result"], "")
-    if not res_cls and vivo:          # aun sin resultado final: tinte leve en vivo
-        res_cls = f" v-{vivo}"
-    return (
-        f'<tr class="{r["estado"]}{res_cls}">'
-        f'<td class="c-hora">{r["hora"]}</td>'
-        f'<td class="c-est">{estado_badge}</td>'
-        f'<td class="c-part"><span class="teams">{team_logo(g["away_id"], g["away_team"])}'
-        f'<span class="t">{g["away_team"]}</span>'
-        f'<span class="vs">vs</span>{team_logo(g["home_id"], g["home_team"])}'
-        f'<span class="t">{g["home_team"]}</span></span></td>'
-        f'<td>{pick_td}</td>'
-        f'<td class="num">{prob_td}</td>'
-        f'<td class="num">{odds_td}</td>'
-        f'<td class="num">{ev_td}</td>'
-        f'<td class="c-res">{dot}</td></tr>'
-    )
-
-
 # ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
 PAGES = [
     ("space_dashboard", "grid", "Dashboard"),
-    ("today", "calendar", "Jornada de hoy"),
     ("track_changes", "target", "Predicciones"),
     ("sensors", "sensors", "En vivo"),
     ("receipt_long", "receipt", "Resultados"),
@@ -1499,58 +1386,6 @@ with st.sidebar:
         f'<p class="lab">Versión</p><p class="val">{VERSION}</p></div>',
         unsafe_allow_html=True,
     )
-
-
-def render_matchday_table(live, titulo="Jornada y picks del día"):
-    """Tabla unificada: un renglón por partido, con su pick, cuota, EV y resultado."""
-    md_rows = build_matchday_rows(live, sorted_bets)
-    con_pick = sum(1 for r in md_rows if r["pick"])
-    page_section(titulo, f"{len(live)} partidos · {con_pick} con pick · ordenados por EV")
-    st.markdown(
-        '<div class="fh-tablewrap"><table class="fh-mtable">'
-        + '<thead><tr>'
-        + '<th class="c-hora">Hora</th><th class="c-est">Estado</th><th>Partido</th>'
-        + '<th>Pick</th><th class="num">Prob.</th><th class="num">Cuota</th>'
-        + '<th class="num">EV</th><th class="c-res">●</th>'
-        + '</tr></thead><tbody>'
-        + ("".join(match_table_row(r) for r in md_rows)
-           or '<tr><td colspan="8" style="padding:16px;color:rgb(var(--ink2));">'
-              'Sin partidos en la jornada.</td></tr>')
-        + '</tbody></table></div>',
-        unsafe_allow_html=True)
-    return md_rows
-
-
-# ---------------------------------------------------------------------------
-# PÁGINA: Jornada de hoy
-# ---------------------------------------------------------------------------
-def render_jornada():
-    live = fetch_live_scores()
-    en_vivo = [g for g in live if g["is_live"]]
-    prox = [g for g in live if not g["is_live"] and not g["is_final"]]
-    fin = [g for g in live if g["is_final"]]
-
-    a, b = st.columns([1, 5])
-    if a.button("🔄 Actualizar", type="primary", use_container_width=True):
-        fetch_live_scores.clear()
-        st.rerun()
-    b.markdown(
-        f'<p style="color:rgb(var(--ink2));font-size:13px;margin-top:9px;">'
-        f'🔴 {len(en_vivo)} en vivo · 🔵 {len(prox)} por comenzar · ✅ {len(fin)} finalizados '
-        f'· {now_local().strftime("%d/%m/%Y")}</p>',
-        unsafe_allow_html=True)
-
-    md_rows = render_matchday_table(live)
-
-    aprobados = [r for r in md_rows if r["bet"] and r["bet"]["approved"]]
-    ganados = sum(1 for r in md_rows if r["result"] == "WON")
-    perdidos = sum(1 for r in md_rows if r["result"] == "LOST")
-    pendientes = sum(1 for r in md_rows if r["bet"] and r["result"] is None)
-    c = st.columns(4, gap="large")
-    stat_tile(c[0], "Partidos", str(len(live)), "en la jornada", True, "contrast", "fare")
-    stat_tile(c[1], "Picks aprobados", str(len(aprobados)), "+EV del modelo", True, "target", "fare")
-    stat_tile(c[2], "Resueltos", f"{ganados}-{perdidos}", "ganados-perdidos", ganados >= perdidos, "trophy", "save")
-    stat_tile(c[3], "Pendientes", str(pendientes), "por definir", True, "radio", "warn")
 
 
 # ---------------------------------------------------------------------------
@@ -1626,10 +1461,7 @@ def render_dashboard():
         st.markdown(parlay_card_html(build_parlay(sorted_bets, live), live),
                     unsafe_allow_html=True)
 
-    # La tabla de la jornada vive ahora en su propia pestaña "Jornada de hoy",
-    # asi que aqui no se repite.
-
-    # Los marcadores en vivo viven ahora en la pestaña "En Vivo".
+    # Los marcadores en vivo viven en la pestaña "En Vivo".
 
     bcol1, bcol2 = st.columns(2, gap="large")
     if bcol1.button("Ver todos los picks aprobados", key="see_picks", type="secondary", use_container_width=True):
@@ -2202,7 +2034,6 @@ def _sin_jornada():
 
 ROUTES = {
     "Dashboard": render_dashboard,
-    "Jornada de hoy": render_jornada,
     "Predicciones": render_predicciones,
     "En vivo": render_en_vivo,
     "Resultados": render_resultados,
