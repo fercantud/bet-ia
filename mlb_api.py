@@ -119,7 +119,9 @@ class MLBDataFetcher:
                     "home_errors": ls_teams.get('home', {}).get('errors', 0),
                     "state": abstract,
                     "detail": status.get('detailedState', ''),
-                    "is_live": abstract == 'Live',
+                    # La API marca abstractGameState="Live" desde que empieza el calentamiento
+                    # (detailedState="Warmup"), ~30 min antes del primer lanzamiento real.
+                    "is_live": abstract == 'Live' and status.get('detailedState') not in ('Warmup', 'Pre-Game'),
                     "is_final": abstract == 'Final',
                     "inning": ls.get('currentInning', 0) or 0,
                     "inning_ordinal": ls.get('currentInningOrdinal', ''),

@@ -551,6 +551,82 @@ div[data-baseweb="select"] > div, .stTextInput > div > div, .stNumberInput > div
 [data-testid="stDataFrame"]{ border:1px solid rgb(var(--line)); border-radius:12px; overflow:hidden; }
 .stCheckbox label p{ color:rgb(var(--ink2)); font-size:13px; }
 hr{ border-color:rgb(var(--line)); }
+
+/* ---- "En vivo": tabla unificada tipo mercado (rediseño) ---- */
+.lv-brand{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.lv-brand img{ width:22px; height:22px; object-fit:contain; }
+.lv-brand b{ font-size:14px; font-weight:800; letter-spacing:-.01em; color:rgb(var(--ink)); }
+.st-key-lv_f_todos .stButton>button, .st-key-lv_f_prev .stButton>button,
+.st-key-lv_f_live .stButton>button, .st-key-lv_f_final .stButton>button{
+    border-radius:999px !important; font-size:11.5px !important; font-weight:700 !important;
+    letter-spacing:.02em; padding:7px 6px !important; }
+.st-key-lv_f_todos .stButton>button[kind="secondary"], .st-key-lv_f_prev .stButton>button[kind="secondary"],
+.st-key-lv_f_live .stButton>button[kind="secondary"], .st-key-lv_f_final .stButton>button[kind="secondary"]{
+    background:rgb(var(--surface)); border:1px solid rgb(var(--line)); color:rgb(var(--ink2)); }
+.st-key-lv_f_todos .stButton>button[kind="primary"]{ background:rgb(var(--ink)); border-color:rgb(var(--ink)); box-shadow:none; }
+.st-key-lv_f_prev .stButton>button[kind="primary"]{ background:rgb(var(--blue)); border-color:rgb(var(--blue)); box-shadow:none; }
+.st-key-lv_f_live .stButton>button[kind="primary"]{ background:rgb(var(--fare)); border-color:rgb(var(--fare)); box-shadow:none; }
+.st-key-lv_f_final .stButton>button[kind="primary"]{ background:rgb(var(--ink2)); border-color:rgb(var(--ink2)); box-shadow:none; }
+.lv-status{ display:flex; align-items:center; gap:6px; font-size:12px; color:rgb(var(--ink2));
+    margin:2px 0 14px 0 !important; }
+.lv-status svg{ opacity:.6; }
+.lv-status .lv-dot{ margin:0 2px; opacity:.5; }
+.lv-tablewrap{ border:1px solid rgb(var(--line)); border-radius:12px; overflow-x:auto; }
+.lv-cols{ grid-template-columns:78px 104px minmax(170px,1fr) 84px 156px 52px 52px 72px 112px 62px; }
+.lv-head{ display:grid; column-gap:8px; padding:10px 12px; background:rgb(var(--surface2));
+    color:rgb(var(--ink2)); font-size:10.5px; font-weight:700; letter-spacing:.07em;
+    text-transform:uppercase; border-bottom:1px solid rgb(var(--line)); white-space:nowrap; }
+.lv-head small{ text-transform:none; font-weight:500; font-size:9.5px; opacity:.7; margin-left:3px; }
+.lv-row{ min-width:1000px; }
+.lv-sum{ display:grid; column-gap:8px; align-items:center; padding:9px 12px; cursor:pointer;
+    list-style:none; border-bottom:1px solid rgb(var(--line)); transition:background .12s ease; }
+.lv-sum::-webkit-details-marker{ display:none; }
+.lv-sum::marker{ content:''; }
+.lv-body:hover>.lv-sum{ background:rgb(var(--surface2)/0.55); }
+.lv-body.v-win>.lv-sum{ background:rgb(var(--save)/0.06); }
+.lv-body.v-lose>.lv-sum{ background:rgb(var(--fare)/0.055); }
+.lv-body.v-tie>.lv-sum{ background:rgb(var(--ink2)/0.055); }
+.lv-body:last-of-type>.lv-sum{ border-bottom:none; }
+.lv-body.live .c-hora{ color:rgb(var(--accent)); font-weight:700; }
+.lv-head .num, .lv-sum .num{ text-align:right; font-variant-numeric:tabular-nums; font-weight:700; }
+.lv-head .c-det{ text-align:center; }
+.lv-sum .c-det{ display:flex; align-items:center; justify-content:center; gap:6px; }
+.lv-sum .fh-tres{ width:21px; height:21px; font-size:11px; flex-shrink:0; }
+.lv-sum .fh-tres.empty{ background:transparent; border:1px dashed rgb(var(--line)); }
+.lv-sum .c-hora{ font-variant-numeric:tabular-nums; font-weight:700; color:rgb(var(--ink2)); white-space:nowrap; }
+.lv-sum .teams{ display:flex; align-items:center; gap:7px; min-width:0; }
+.lv-sum .teams img{ width:20px; height:20px; object-fit:contain; flex-shrink:0; }
+.lv-sum .teams .t{ font-weight:600; color:rgb(var(--ink)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lv-sum .teams .vs{ color:rgb(var(--ink2)); font-size:11.5px; margin:0 2px; flex-shrink:0; }
+.lv-marc{ font-variant-numeric:tabular-nums; font-weight:800; font-size:14px; letter-spacing:-.01em; color:rgb(var(--ink2)); }
+.lv-marc i{ font-style:normal; opacity:.45; margin:0 1px; }
+.lv-marc.live{ color:rgb(var(--accent)); }
+.lv-marc.final{ color:rgb(var(--ink)); }
+.c-marc small{ display:block; font-size:10px; color:rgb(var(--ink2)); margin-top:1px; font-weight:500; }
+.c-pick .pick-nm{ display:block; font-weight:600; color:rgb(var(--ink)); font-size:12.5px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.c-pick .pick-mkt{ display:block; font-size:10.5px; color:rgb(var(--ink2)); margin-top:1px; }
+.lv-sum .vacio{ color:rgb(var(--ink2)); opacity:.5; }
+.lv-sum .ev.pos{ color:rgb(var(--save)); } .lv-sum .ev.neg{ color:rgb(var(--fare)); }
+.c-inicio{ font-size:11.5px; color:rgb(var(--ink2)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lv-body.live .c-inicio{ color:rgb(var(--accent)); font-weight:600; }
+.lv-chev{ transition:transform .15s ease; color:rgb(var(--ink2)); display:inline-flex; }
+.lv-body[open]>.lv-sum .lv-chev{ transform:rotate(180deg); color:rgb(var(--accent)); }
+.lv-detail{ padding:14px 20px 16px 20px; background:rgb(var(--surface2)/0.5);
+    border-bottom:1px solid rgb(var(--line)); font-size:12.5px; color:rgb(var(--ink2)); }
+.lv-body:last-of-type .lv-detail{ border-bottom:none; }
+.lv-dgrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px 18px; margin-bottom:10px; }
+.lv-dgrid p{ margin:0 !important; font-size:10.5px !important; text-transform:uppercase;
+    letter-spacing:.05em; color:rgb(var(--ink2)); }
+.lv-dgrid b{ font-size:13.5px; font-weight:700; color:rgb(var(--ink)); }
+.lv-notes{ padding-top:8px; border-top:1px dashed rgb(var(--line)); }
+.lv-notes p{ margin:3px 0 !important; line-height:1.55 !important; font-size:12px !important; }
+.lv-notes b{ color:rgb(var(--ink)); }
+.lv-legend{ display:flex; align-items:center; gap:18px; flex-wrap:wrap; font-size:12px;
+    color:rgb(var(--ink2)); margin:14px 2px 0 2px !important; }
+.lv-legend .dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+.lv-legend .dot.live{ background:rgb(var(--fare)); } .lv-legend .dot.blue{ background:rgb(var(--blue)); }
+.lv-legend .dot.neutral{ background:rgb(var(--ink2)); } .lv-legend .dot.warn{ background:rgb(var(--warn)); }
 </style>
 ''', unsafe_allow_html=True)
 
@@ -575,6 +651,8 @@ ICONS = {
     "user": '<circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/>',
     "share": '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/>',
     "calendar": '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/>',
+    "chevron": '<path d="m6 9 6 6 6-6"/>',
+    "info": '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
 }
 
 
@@ -657,20 +735,6 @@ def team_logo(team_id, nombre=None):
     return f'<img class="fh-score-logo" src="https://www.mlbstatic.com/team-logos/{team_id}.svg" alt=""/>'
 
 
-def bases_svg(on1, on2, on3):
-    on = "rgb(var(--accent))"
-    off = "rgb(var(--surface))"
-    stroke = "rgb(var(--ink2))"
-
-    def sq(cx, cy, filled):
-        f = on if filled else off
-        s = "none" if filled else stroke
-        return (f'<rect x="{cx-6}" y="{cy-6}" width="12" height="12" rx="1.5" '
-                f'transform="rotate(45 {cx} {cy})" fill="{f}" stroke="{s}" stroke-width="1.3"/>')
-    return (f'<svg width="46" height="40" viewBox="0 0 46 40" xmlns="http://www.w3.org/2000/svg">'
-            f'{sq(23,13,on2)}{sq(33,23,on1)}{sq(13,23,on3)}</svg>')
-
-
 def inning_abbr(state):
     return {"Top": "Top", "Bottom": "Bot", "Middle": "Mid", "End": "End"}.get(state, (state or "")[:3])
 
@@ -701,32 +765,6 @@ def pick_card_html(row, result=None):
         f'<span>Prob. mercado <b>{row["PROB MKT"]:.1%}</b></span>'
         f'<span>Edge <b>{row["EDGE"]:+.1%}</b></span>'
         f'<span>Stake <b>{row["STAKE"]}</b></span></div></div>'
-    )
-
-
-def scoreboard_html(g):
-    live_cls = "live" if g["is_live"] else ""
-    a_lose = "lose" if g["home_score"] > g["away_score"] else ""
-    h_lose = "lose" if g["away_score"] > g["home_score"] else ""
-    if g["is_live"]:
-        st_cls, st_txt = "live", f'{inning_abbr(g["inning_state"])} {g["inning_ordinal"]} · {g["outs"]} Out'
-        diamond = bases_svg(g["on_first"], g["on_second"], g["on_third"])
-    elif g["is_final"]:
-        st_cls, st_txt = "", "Final"
-        diamond = f'<span style="font-size:11px;color:rgb(var(--ink2));">H {g["away_hits"]}-{g["home_hits"]}</span>'
-    else:
-        st_cls, st_txt = "", fmt_start(g["start_utc"])
-        diamond = '<span style="font-size:11px;color:rgb(var(--ink2));">Por comenzar</span>'
-    return (
-        f'<div class="fh-score {live_cls}"><div class="fh-score-main">'
-        f'<div class="fh-score-row">{team_logo(g["away_id"], g["away_team"])}'
-        f'<span class="fh-score-team {a_lose}">{g["away_team"]}</span>'
-        f'<span class="fh-score-runs">{g["away_score"] if g["is_live"] or g["is_final"] else "-"}</span></div>'
-        f'<div class="fh-score-row">{team_logo(g["home_id"], g["home_team"])}'
-        f'<span class="fh-score-team {h_lose}">{g["home_team"]}</span>'
-        f'<span class="fh-score-runs">{g["home_score"] if g["is_live"] or g["is_final"] else "-"}</span></div>'
-        f'</div><div class="fh-score-side">'
-        f'<span class="fh-score-st {st_cls}">{st_txt}</span>{diamond}</div></div>'
     )
 
 
@@ -1489,7 +1527,7 @@ def render_matchday_table(live, titulo="Jornada y picks del día"):
 def render_jornada():
     live = fetch_live_scores()
     en_vivo = [g for g in live if g["is_live"]]
-    prox = [g for g in live if g["state"] == "Preview"]
+    prox = [g for g in live if not g["is_live"] and not g["is_final"]]
     fin = [g for g in live if g["is_final"]]
 
     a, b = st.columns([1, 5])
@@ -1523,7 +1561,7 @@ def render_dashboard():
 
     live = fetch_live_scores()
     live_now = [g for g in live if g["is_live"]]
-    prev = [g for g in live if g["state"] == "Preview"]
+    prev = [g for g in live if not g["is_live"] and not g["is_final"]]
     hist = load_history()
     settled = hist[hist["result"] != "PENDING"] if not hist.empty else hist
     net = (hist["profit_loss"].sum() * bankroll_default()) if not hist.empty else 0.0
@@ -1638,15 +1676,111 @@ def render_predicciones():
 # ---------------------------------------------------------------------------
 # PÁGINA: En Vivo
 # ---------------------------------------------------------------------------
+MARKET_LABEL = {"ML": "Moneyline", "TOTAL": "Total", "F5": "Primeros 5"}
+
+
+def start_countdown(g):
+    """Texto de la columna Inicio: cuenta regresiva, inning en curso o 'Finalizado'."""
+    if g["is_live"]:
+        return f'{inning_abbr(g["inning_state"])} {g["inning_ordinal"]}'
+    if g["is_final"]:
+        return "Finalizado"
+    try:
+        dt = datetime.fromisoformat(g["start_utc"].replace("Z", "+00:00"))
+        dt = dt.astimezone(_TZ) if _TZ else dt.astimezone()
+        mins = int((dt - now_local()).total_seconds() // 60)
+    except Exception:
+        return ""
+    if mins <= 0:
+        return "Por comenzar"
+    h, m = divmod(mins, 60)
+    return f"Empieza en {h} h {m} min" if h else f"Empieza en {m} min"
+
+
+def live_detail_html(r):
+    """Panel expandible (DETALLE) de una fila: desglose del pick o abridores."""
+    g, bet = r["game"], r["bet"]
+    pitchers = (f'<div><p>Abridor visitante</p><b>{g["away_pitcher"] or "Por confirmar"}</b></div>'
+                f'<div><p>Abridor local</p><b>{g["home_pitcher"] or "Por confirmar"}</b></div>')
+    if not bet:
+        return (f'<div class="lv-detail"><div class="lv-dgrid">{pitchers}</div>'
+                '<p style="margin:8px 0 0 0;">Sin pick del modelo para este partido.</p></div>')
+    return (
+        '<div class="lv-detail"><div class="lv-dgrid">'
+        f'<div><p>Prob. mercado</p><b>{bet["prob_market"]:.1%}</b></div>'
+        f'<div><p>Edge</p><b>{bet["edge"]:+.1%}</b></div>'
+        f'<div><p>Score</p><b>{bet["score"]:.0f}/100</b></div>'
+        f'<div><p>Confianza</p><b>{bet["confidence"]:.1f}/10</b></div>'
+        f'<div><p>Riesgo</p><b>{bet["risk"]}</b></div>'
+        f'{pitchers}</div>'
+        '<div class="lv-notes">'
+        f'<p>🎯 <b>Pitcheo:</b> {bet["pitching"]}</p>'
+        f'<p>🛡️ <b>Bullpen:</b> {bet["bullpen"]}</p>'
+        f'<p>⚔️ <b>Ofensiva:</b> {bet["offense"]}</p>'
+        f'<p>🏛️ <b>Mercado:</b> {bet["movement"]}</p></div></div>'
+    )
+
+
+def live_table_row(r):
+    """Fila expandible: Hora/Estado/Partido/Marcador/Pick IA/Prob/Cuota/EV/Inicio/Detalle."""
+    g, bet = r["game"], r["bet"]
+    estado_badge = {
+        "live": badge("EN VIVO", "live"),
+        "prev": badge("PRÓXIMO", "blue"),
+        "final": badge("FINALIZADO", "neutral"),
+    }[r["estado"]]
+
+    if r["estado"] in ("live", "final"):
+        marc_cls = "live" if r["estado"] == "live" else "final"
+        marcador = f'<span class="lv-marc {marc_cls}">{g["away_score"]}<i>-</i>{g["home_score"]}</span>'
+        marc_sub = f'{inning_abbr(g["inning_state"])} {g["inning_ordinal"]}' if r["estado"] == "live" else "Final"
+    else:
+        marcador = '<span class="lv-marc">-<i>-</i>-</span>'
+        marc_sub = "Por comenzar"
+
+    if bet:
+        ev_cls = "pos" if bet["ev"] > 0 else "neg"
+        pick_html = (f'<span class="pick-nm">{r["pick"]}</span>'
+                     f'<span class="pick-mkt">{MARKET_LABEL.get(bet["market"], bet["market"])}</span>')
+        prob_td, odds_td = f'{bet["prob_model"]:.0%}', f'{bet["odds"]:.2f}'
+        ev_td = f'<span class="ev {ev_cls}">{bet["ev"]:+.1%}</span>'
+    else:
+        pick_html = '<span class="vacio">—</span>'
+        prob_td = odds_td = ev_td = '<span class="vacio">—</span>'
+
+    vivo = live_pick_status(bet, g)
+    res_cls = {"WON": " v-win", "LOST": " v-lose", "PUSH": " v-tie"}.get(r["result"], "")
+    if not res_cls and vivo:
+        res_cls = f" v-{vivo}"
+
+    if bet is None:
+        resultado_dot = '<span class="fh-tres empty"></span>'
+    else:
+        res_ico_cls, res_ico = {"WON": ("won", "✓"), "LOST": ("lost", "✗"),
+                                 "PUSH": ("push", "=")}.get(r["result"], ("pend", "•"))
+        resultado_dot = f'<span class="fh-tres {res_ico_cls}">{res_ico}</span>'
+
+    return (
+        f'<details class="lv-row lv-body {r["estado"]}{res_cls}">'
+        f'<summary class="lv-sum lv-cols">'
+        f'<span class="c-hora">{r["hora"]}</span>'
+        f'<span class="c-est">{estado_badge}</span>'
+        f'<span class="c-part"><span class="teams">{team_logo(g["away_id"], g["away_team"])}'
+        f'<span class="t">{g["away_team"]}</span><span class="vs">vs</span>'
+        f'{team_logo(g["home_id"], g["home_team"])}<span class="t">{g["home_team"]}</span></span></span>'
+        f'<span class="c-marc">{marcador}<small>{marc_sub}</small></span>'
+        f'<span class="c-pick">{pick_html}</span>'
+        f'<span class="c-prob num">{prob_td}</span>'
+        f'<span class="c-cuota num">{odds_td}</span>'
+        f'<span class="c-ev num">{ev_td}</span>'
+        f'<span class="c-inicio">{start_countdown(g)}</span>'
+        f'<span class="c-det">{resultado_dot}<span class="lv-chev">{svg("chevron", 15)}</span></span>'
+        f'</summary>{live_detail_html(r)}</details>'
+    )
+
+
 def render_en_vivo():
-    """Marcadores en vivo (movidos aqui desde el Dashboard)."""
-    topbar("En vivo", "Marcadores en tiempo real · MLB Stats API", "sensors")
-
-    a, b = st.columns([1, 5])
-    if a.button("🔄 Actualizar", type="primary", use_container_width=True):
-        fetch_live_scores.clear()
-        st.rerun()
-
+    """Radar de partidos: tabla unificada con marcador, pick IA y detalle expandible."""
     live = fetch_live_scores()
     if not live:
         st.markdown('<div class="fh-card"><div class="fh-card-body">'
@@ -1654,28 +1788,87 @@ def render_en_vivo():
                     'disponibles ahora mismo.</p></div></div>', unsafe_allow_html=True)
         return
 
-    live_now = [g for g in live if g["is_live"]]
-    prev = [g for g in live if g["state"] == "Preview"]
-    finals = [g for g in live if g["is_final"]]
+    if "lv_filter" not in st.session_state:
+        st.session_state.lv_filter = "todos"
+    if "lv_last_fetch" not in st.session_state:
+        st.session_state.lv_last_fetch = now_local()
 
-    b.markdown(
-        f'<p style="color:rgb(var(--ink2));font-size:13px;margin-top:9px;">'
-        f'🔴 {len(live_now)} en vivo · 🔵 {len(prev)} por comenzar · ✅ {len(finals)} finalizados '
-        f'· {now_local().strftime("%d/%m/%Y")}</p>',
+    en_vivo_n = sum(1 for g in live if g["is_live"])
+    prox_n = sum(1 for g in live if not g["is_live"] and not g["is_final"])
+    fin_n = sum(1 for g in live if g["is_final"])
+
+    top_l, top_r = st.columns([3, 2], gap="large")
+    with top_l:
+        liga_logo = f'https://www.mlbstatic.com/team-logos/league-on-light/{LIGA["logo_id"]}.svg'
+        st.markdown(f'<div class="lv-brand"><img src="{liga_logo}" alt=""/>'
+                    f'<b>{LIGA["nombre"]}</b></div>', unsafe_allow_html=True)
+        pc = st.columns(4, gap="small")
+        for col, (clave, etiqueta, n) in zip(pc, [
+            ("todos", "PARTIDOS", len(live)), ("prev", "PRÓXIMOS", prox_n),
+            ("live", "EN VIVO", en_vivo_n), ("final", "FINALIZADOS", fin_n),
+        ]):
+            activo = st.session_state.lv_filter == clave
+            if col.button(f"{n} {etiqueta}", key=f"lv_f_{clave}", use_container_width=True,
+                          type="primary" if activo else "secondary"):
+                st.session_state.lv_filter = clave
+                st.rerun()
+    with top_r:
+        s1, s2, s3 = st.columns([3, 1, 1.3])
+        busqueda = s1.text_input("Buscar", key="lv_search", placeholder="Buscar partido o equipo...",
+                                  label_visibility="collapsed")
+        if s2.button("🔄", key="lv_refresh", use_container_width=True, help="Actualizar"):
+            fetch_live_scores.clear()
+            st.session_state.lv_last_fetch = now_local()
+            st.rerun()
+        with s3.popover("⚙️ Filtros", use_container_width=True):
+            st.checkbox("Solo partidos con Pick IA", key="lv_solo_pick")
+            st.multiselect("Mercado", ["ML", "TOTAL", "F5"], default=["ML", "TOTAL", "F5"], key="lv_mercados")
+
+    elapsed = int((now_local() - st.session_state.lv_last_fetch).total_seconds())
+    st.markdown(
+        f'<p class="lv-status">{svg("target", 13)} Ordenados por EV'
+        f'<span class="lv-dot">·</span>{svg("info", 13)} Actualizado hace {elapsed}s'
+        f'<span class="lv-dot">·</span>{now_local().strftime("%d/%m/%Y")}</p>',
         unsafe_allow_html=True)
 
-    for titulo, sub, grupo, icono, tono in [
-        ("Marcadores en vivo", "Partidos en curso ahora mismo", live_now, "radio", "live"),
-        ("Próximos partidos", "Aún no comienzan", prev, "sensors", "blue"),
-        ("Finalizados", "Resultado final", finals, "receipt", "neutral"),
-    ]:
-        page_section(f'{titulo} <span class="rt-count">{len(grupo)}</span>', sub)
-        if grupo:
-            cuerpo = f'<div class="fh-grid">{"".join(scoreboard_html(g) for g in grupo)}</div>'
-        else:
-            cuerpo = '<p style="color:rgb(var(--ink2));font-size:13.5px;margin:0;">Nada por aquí.</p>'
-        st.markdown(cuerpo, unsafe_allow_html=True)
+    juegos = live
+    filtro = st.session_state.lv_filter
+    if filtro == "prev":
+        juegos = [g for g in juegos if not g["is_live"] and not g["is_final"]]
+    elif filtro == "live":
+        juegos = [g for g in juegos if g["is_live"]]
+    elif filtro == "final":
+        juegos = [g for g in juegos if g["is_final"]]
+    if busqueda.strip():
+        q = busqueda.strip().lower()
+        juegos = [g for g in juegos if q in g["away_team"].lower() or q in g["home_team"].lower()]
 
+    md_rows = build_matchday_rows(juegos, sorted_bets)
+    if st.session_state.get("lv_solo_pick"):
+        md_rows = [r for r in md_rows if r["bet"]]
+    mercados_sel = st.session_state.get("lv_mercados") or ["ML", "TOTAL", "F5"]
+    md_rows = [r for r in md_rows if not r["bet"] or r["bet"]["market"] in mercados_sel]
+
+    st.markdown(
+        '<div class="lv-tablewrap">'
+        '<div class="lv-head lv-cols">'
+        '<span class="c-hora">Hora <small>Local</small></span><span class="c-est">Estado</span>'
+        '<span class="c-part">Partido</span><span class="c-marc">Marcador</span>'
+        '<span class="c-pick">Pick IA</span><span class="c-prob num">Prob.</span>'
+        '<span class="c-cuota num">Cuota</span><span class="c-ev num">EV</span>'
+        '<span class="c-inicio">Inicio</span><span class="c-det">Detalle</span></div>'
+        + ("".join(live_table_row(r) for r in md_rows) if md_rows else
+           '<p style="padding:18px;color:rgb(var(--ink2));margin:0;">Sin partidos para este filtro.</p>')
+        + '</div>',
+        unsafe_allow_html=True)
+
+    st.markdown(
+        '<p class="lv-legend">'
+        '<span><span class="dot live"></span>En Vivo</span>'
+        '<span><span class="dot blue"></span>Próximo</span>'
+        '<span><span class="dot neutral"></span>Finalizado</span>'
+        '<span><span class="dot warn"></span>Retrasado</span>'
+        '</p>', unsafe_allow_html=True)
     st.caption(f"Datos en caché 60s · última lectura {hora12(now_local(), con_segundos=True)}")
 
 
