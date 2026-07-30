@@ -298,13 +298,13 @@ def rank_bets(raw_bets):
         # Asignación de Stake e indicadores visuales según Score y EV
         if bet['ev'] > 0:
             if bet['score'] >= 85:
-                stake = "3%"
+                stake = "30%"
                 tag = "🔥 ELITE"
             elif bet['score'] >= 75:
-                stake = "2%" if bet['score'] >= 80 else "1%"
+                stake = "20%" if bet['score'] >= 80 else "10%"
                 tag = "✅ VALUE"
             elif bet['score'] >= 65:
-                stake = "1%"
+                stake = "10%"
                 tag = "⚠️ MOD"
             else:
                 stake = "0%"

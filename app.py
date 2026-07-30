@@ -364,6 +364,12 @@ svg{ display:inline-block; vertical-align:middle; }
 .rt-pl.pos{ color:rgb(var(--save)); font-weight:700; }
 .rt-pl.neg{ color:rgb(var(--fare)); font-weight:700; }
 .rt-pl.zero{ color:rgb(var(--ink2)); }
+/* Picks del mismo partido: una fila por pick, unidas visualmente en un bloque */
+.rt-table tbody tr.grp td{ border-bottom:none; }
+.rt-table tbody tr.grp.grp-end td{ border-bottom:1px solid rgb(var(--line)); }
+.rt-table tbody tr.grp td:first-child{ box-shadow:inset 2px 0 0 rgb(var(--accent)/0.55); }
+.rt-multi{ margin-left:8px; font-size:10px; font-weight:700; letter-spacing:.03em;
+    color:rgb(var(--accent)); background:rgb(var(--accent)/0.12); padding:1px 7px; border-radius:999px; }
 
 /* ---- Chief Tipster: rejilla compacta ---- */
 .ct-grid{ margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; }
@@ -513,12 +519,12 @@ hr{ border-color:rgb(var(--line)); }
 .lv-status svg{ opacity:.6; }
 .lv-status .lv-dot{ margin:0 2px; opacity:.5; }
 .lv-tablewrap{ border:1px solid rgb(var(--line)); border-radius:12px; overflow-x:auto; }
-.lv-cols{ grid-template-columns:78px 104px minmax(300px,1.5fr) 84px 156px 52px 52px 72px 112px 62px; }
+.lv-cols{ grid-template-columns:78px 104px minmax(300px,1.5fr) 84px 156px 52px 52px 72px 58px 112px 62px; }
 .lv-head{ display:grid; column-gap:8px; padding:10px 12px; background:rgb(var(--surface2));
     color:rgb(var(--ink2)); font-size:10.5px; font-weight:700; letter-spacing:.07em;
     text-transform:uppercase; border-bottom:1px solid rgb(var(--line)); white-space:nowrap; }
 .lv-head small{ text-transform:none; font-weight:500; font-size:9.5px; opacity:.7; margin-left:3px; }
-.lv-row{ min-width:1130px; }
+.lv-row{ min-width:1196px; }
 .lv-sum{ display:grid; column-gap:8px; align-items:center; padding:9px 12px; cursor:pointer;
     list-style:none; border-bottom:1px solid rgb(var(--line)); transition:background .12s ease; }
 .lv-sum::-webkit-details-marker{ display:none; }
@@ -558,6 +564,7 @@ hr{ border-color:rgb(var(--line)); }
 .c-pick .pick-mkt{ display:block; font-size:10.5px; color:rgb(var(--ink2)); margin-top:1px; }
 .lv-sum .vacio{ color:rgb(var(--ink2)); opacity:.5; }
 .lv-sum .ev.pos{ color:rgb(var(--save)); } .lv-sum .ev.neg{ color:rgb(var(--fare)); }
+.lv-sum .stk.on{ color:rgb(var(--accent)); } .lv-sum .stk.off{ color:rgb(var(--ink2)); opacity:.5; }
 .c-inicio{ font-size:11.5px; color:rgb(var(--ink2)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .lv-body.live .c-inicio{ color:rgb(var(--accent)); font-weight:600; }
 .lv-chev{ transition:transform .15s ease; color:rgb(var(--ink2)); display:inline-flex; }
@@ -952,14 +959,19 @@ def sync_today_picks():
     (nunca se borran). Los picks NO BET (stake 0%) se guardan con beneficio 0."""
     bets = _read_history_file()
     today = fecha_jornada()
-    existing_today = {(b["matchup"], b["selection"]) for b in bets
+    # Deduplica por (partido, MERCADO), no por selección: un partido puede tener
+    # a lo más un pick por mercado (ML, TOTAL, F5). Así ML + TOTAL del mismo juego
+    # conviven, pero se bloquean picks contradictorios del MISMO mercado —p. ej.
+    # Over 7.5 y Under 7.5— que en corridas a distinta hora se colaban como dos
+    # selecciones distintas.
+    existing_today = {(b["matchup"], b.get("market")) for b in bets
                       if str(b.get("date", "")).startswith(today)}
     next_id = max([int(b.get("id", 0)) for b in bets], default=0) + 1
     added = False
     for i, b in enumerate(sorted_bets):
-        key = (b["matchup"], b["selection"])
+        key = (b["matchup"], b["market"])
         if key in existing_today:
-            continue  # ya registrado HOY: no duplicar dentro del mismo día
+            continue  # ya registrado HOY: no duplicar mercado dentro del mismo día
         frac = float(str(b["stake"]).replace("%", "").strip() or 0) / 100.0  # "2%" -> 0.02
         bets.append({
             "id": next_id, "date": f"{today} 09:{i:02d}:00",
@@ -1509,7 +1521,6 @@ def build_matchday_rows(games, bets):
 # ---------------------------------------------------------------------------
 PAGES = [
     ("space_dashboard", "grid", "Dashboard"),
-    ("track_changes", "target", "Predicciones"),
     ("sensors", "sensors", "En vivo"),
     ("receipt_long", "receipt", "Resultados"),
     ("leaderboard", "trophy", "Rendimiento"),
@@ -1639,46 +1650,9 @@ def render_dashboard():
 
     # Los marcadores en vivo viven en la pestaña "En Vivo".
 
-    bcol1, bcol2 = st.columns(2, gap="large")
-    if bcol1.button("Ver todos los picks aprobados", key="see_picks", type="secondary", use_container_width=True):
-        st.session_state.page = "Predicciones"
-        st.rerun()
-    if bcol2.button("Ver todos los partidos", key="see_games", type="secondary", use_container_width=True):
+    if st.button("Ver todos los partidos", key="see_games", type="secondary", use_container_width=True):
         st.session_state.page = "En vivo"
         st.rerun()
-
-
-# ---------------------------------------------------------------------------
-# PÁGINA: Predicciones
-# ---------------------------------------------------------------------------
-def render_predicciones():
-    games = fetch_live_scores()
-    filtered = board_df                      # sin filtros: se muestran todos los picks
-
-    won = sum(1 for _, r in board_df.iterrows() if settle_pick(r["PARTIDO"], r["SELECCIÓN"], r["MERCADO"], games) == "WON")
-    lost = sum(1 for _, r in board_df.iterrows() if settle_pick(r["PARTIDO"], r["SELECCIÓN"], r["MERCADO"], games) == "LOST")
-    sub = f"{len(board_df)} partidos · ✅ {won} ganados · ❌ {lost} perdidos"
-    page_section("Tablero de Oportunidades +EV", sub)
-    if len(filtered):
-        cards = "".join(
-            pick_card_html(r, settle_pick(r["PARTIDO"], r["SELECCIÓN"], r["MERCADO"], games))
-            for _, r in filtered.iterrows()
-        )
-        st.markdown(f'<div class="fh-grid picks">{cards}</div>', unsafe_allow_html=True)
-    else:
-        st.markdown('<p style="color:rgb(var(--ink2));">Sin picks para hoy.</p>', unsafe_allow_html=True)
-
-    with st.expander("🔍 Mercados analizados (desglose técnico)"):
-        for b in sorted_bets[:3]:
-            st.markdown(f"**{b['matchup']}**")
-            st.markdown(f"➔ *Moneyline* | Prob: {b['prob_model']:.1%} | Edge: {b['edge']:+.1%} | EV: {b['ev']:+.1%}")
-            st.markdown("➔ *Total Runs* | Prob: 55.0% | Edge: +3.0% | EV: +2.1%")
-            st.markdown("➔ *First 5 (F5)* | Prob: 58.0% | Edge: +4.2% | EV: +3.0%")
-            st.markdown("")
-
-    # El parlay del dia, hasta abajo
-    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-    st.markdown(parlay_card_html(build_parlay(sorted_bets, games), games), unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1752,9 +1726,12 @@ def live_table_row(r, records=None):
                      f'<span class="pick-mkt">{MARKET_LABEL.get(bet["market"], bet["market"])}</span>')
         prob_td, odds_td = f'{bet["prob_model"]:.0%}', f'{bet["odds"]:.2f}'
         ev_td = f'<span class="ev {ev_cls}">{bet["ev"]:+.1%}</span>'
+        stake_val = str(bet.get("stake", "0%"))
+        stk_cls = "off" if stake_val.strip() in ("0%", "0", "") else "on"
+        stake_td = f'<span class="stk {stk_cls}">{stake_val}</span>'
     else:
         pick_html = '<span class="vacio">—</span>'
-        prob_td = odds_td = ev_td = '<span class="vacio">—</span>'
+        prob_td = odds_td = ev_td = stake_td = '<span class="vacio">—</span>'
 
     vivo = live_pick_status(bet, g)
     res_cls = {"WON": " v-win", "LOST": " v-lose", "PUSH": " v-tie"}.get(r["result"], "")
@@ -1782,6 +1759,7 @@ def live_table_row(r, records=None):
         f'<span class="c-prob num">{prob_td}</span>'
         f'<span class="c-cuota num">{odds_td}</span>'
         f'<span class="c-ev num">{ev_td}</span>'
+        f'<span class="c-stake num">{stake_td}</span>'
         f'<span class="c-inicio">{start_countdown(g)}</span>'
         f'<span class="c-det">{resultado_dot}<span class="lv-chev">{svg("chevron", 15)}</span></span>'
         f'</summary>{live_detail_html(r)}</details>'
@@ -1870,6 +1848,7 @@ def render_en_vivo():
         '<span class="c-part">Partido</span><span class="c-marc">Marcador</span>'
         '<span class="c-pick">Pick IA</span><span class="c-prob num">Prob.</span>'
         '<span class="c-cuota num">Cuota</span><span class="c-ev num">EV</span>'
+        '<span class="c-stake num">Stake</span>'
         '<span class="c-inicio">Inicio</span><span class="c-det">Detalle</span></div>'
         + ("".join(live_table_row(r, records) for r in md_rows) if md_rows else
            '<p style="padding:18px;color:rgb(var(--ink2));margin:0;">Sin partidos para este filtro.</p>')
@@ -2089,30 +2068,48 @@ def render_resultados():
             f'&nbsp;·&nbsp; ❌ <b>{n_per}</b> perdidas &nbsp;·&nbsp; beneficio '
             f'<b style="color:rgb({color});">{mxn(ben, signo=True)}</b></p>',
             unsafe_allow_html=True)
-        # Tabla propia (HTML) para poder mostrar logos y el resultado como badge
+        # Tabla propia (HTML) para poder mostrar logos y el resultado como badge.
+        # Los picks del mismo partido se agrupan en filas consecutivas (ancladas
+        # donde el partido aparece por primera vez): cada pick conserva su fila y
+        # sus cifras reales, solo se ocultan Fecha/Partido repetidos y se unen
+        # visualmente en un bloque.
         tone = {"Ganado": "save", "Perdido": "fare", "Push": "warn"}
-        filas = ""
+        grupos = {}
         for _, r in det_f.iterrows():
-            pl = float(r["Beneficio"])
-            cls = "pos" if pl > 0 else ("neg" if pl < 0 else "zero")
-            filas += (
-                f'<tr><td class="fecha">{r["Fecha"]}</td>'
-                f'<td><span class="rt-game">{logos_for_matchup(r["Partido"])}'
-                f'<span class="nm">{r["Partido"]}</span></span></td>'
-                f'<td class="rt-sel">{r["Selección"]}</td>'
-                f'<td class="num">{r["Cuota"]:.2f}</td>'
-                f'<td class="num">{r["Stake %"]:.2f}%</td>'
-                f'<td>{badge(r["Resultado"], tone.get(r["Resultado"], "neutral"))}'
-                + ('<span class="rt-ant" title="Pago anticipado: el equipo llegó a ir '
-                   '5 o más carreras arriba">⚡</span>' if r.get("Anticipado") else "")
-                + '</td>'
-                f'<td class="num rt-pl {cls}">{pl:+,.2f}</td>'
-                f'<td class="num">{mxn(float(r["Saldo"]))}</td></tr>'
-            )
+            grupos.setdefault(r["Partido"], []).append(r)
+
+        filas = ""
+        for partido, rows in grupos.items():
+            n = len(rows)
+            for j, r in enumerate(rows):
+                pl = float(r["Beneficio"])
+                cls = "pos" if pl > 0 else ("neg" if pl < 0 else "zero")
+                primero, ultimo = (j == 0), (j == n - 1)
+                tr_cls = ""
+                if n > 1:
+                    tr_cls = " grp" + (" grp-end" if ultimo else "")
+                fecha_td = f'<td class="fecha">{r["Fecha"] if primero else ""}</td>'
+                if primero:
+                    multi = (f'<span class="rt-multi">{n} picks</span>' if n > 1 else "")
+                    partido_td = (f'<td><span class="rt-game">{logos_for_matchup(r["Partido"])}'
+                                  f'<span class="nm">{r["Partido"]}</span>{multi}</span></td>')
+                else:
+                    partido_td = '<td></td>'      # continuacion: no repetir partido/logos
+                filas += (
+                    f'<tr class="{tr_cls.strip()}">' + fecha_td + partido_td
+                    + f'<td class="rt-sel">{badge(r["Selección"], tone.get(r["Resultado"], "neutral"))}'
+                    + ('<span class="rt-ant" title="Pago anticipado: el equipo llegó a ir '
+                       '5 o más carreras arriba">⚡</span>' if r.get("Anticipado") else "")
+                    + '</td>'
+                    + f'<td class="num">{r["Cuota"]:.2f}</td>'
+                    + f'<td class="num">{r["Stake %"]:.2f}%</td>'
+                    + f'<td class="num rt-pl {cls}">{pl:+,.2f}</td>'
+                    + f'<td class="num">{mxn(float(r["Saldo"]))}</td></tr>'
+                )
         st.markdown(
             '<div class="rt-wrap"><table class="rt-table"><thead><tr>'
             '<th>Fecha</th><th>Partido</th><th>Selección</th><th class="num">Cuota</th>'
-            '<th class="num">Stake %</th><th>Resultado</th><th class="num">Beneficio</th>'
+            '<th class="num">Stake %</th><th class="num">Beneficio</th>'
             '<th class="num">Saldo</th></tr></thead><tbody>'
             + filas + '</tbody></table></div>',
             unsafe_allow_html=True)
@@ -2224,7 +2221,6 @@ def _sin_jornada():
 
 ROUTES = {
     "Dashboard": render_dashboard,
-    "Predicciones": render_predicciones,
     "En vivo": render_en_vivo,
     "Resultados": render_resultados,
     "Rendimiento": render_rendimiento,
