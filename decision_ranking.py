@@ -49,9 +49,12 @@ class RankingEngine:
             {
                 "market": "Total",
                 "selection": (f"Under {total_line:g}" if total_exp < total_line else f"Over {total_line:g}"),
-                "prob": round(p_under if total_exp < total_line else (1.0 - p_under + 0.1), 4),
+                # Over y Under simetricos: p_over = 1 - p_under. Antes el Over llevaba
+                # un +0.1 fijo que le regalaba 10 puntos de probabilidad y creaba edge
+                # falso en TODOS los Over.
+                "prob": round(p_under if total_exp < total_line else (1.0 - p_under), 4),
                 "odds": under_odds if total_exp < total_line else over_odds,
-                "edge": round((p_under if total_exp < total_line else (1.0 - p_under + 0.1)) - (implied_under if total_exp < total_line else implied_over), 4)
+                "edge": round((p_under if total_exp < total_line else (1.0 - p_under)) - (implied_under if total_exp < total_line else implied_over), 4)
             },
             {
                 "market": "F5",

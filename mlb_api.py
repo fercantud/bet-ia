@@ -168,7 +168,11 @@ class MLBDataFetcher:
             whip = float(stats.get('whip', 1.25))
             return {
                 "era": era,
-                "xera": round(era * 0.95, 2), # Estimación dinámicamente ajustada por FIP/xERA
+                # xERA regresado a la media de liga (~4.20). El ERA de temporada es
+                # ruidoso en muestras chicas: sin regresar, un abridor con ERA 1.42
+                # se toma literal y el modelo lo vuelve invencible. Con 40% de peso
+                # al prior, 1.42 -> 2.53 (elite pero humano) y 3.38 -> 3.71.
+                "xera": round(0.6 * era + 0.4 * 4.20, 2),
                 "whip": whip,
                 "k_pct": 0.24,
                 "bb_pct": 0.07

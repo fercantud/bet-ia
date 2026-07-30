@@ -1,5 +1,14 @@
 import random
 
+# --- Calibracion frente al mercado -----------------------------------------
+# El precio de la casa YA incorpora a los abridores; un modelo que solo ve ERA
+# no puede diferir 20 puntos del mercado sin estar equivocado. Encogemos la
+# probabilidad del modelo hacia el precio real de-vig (W_MODEL = peso del modelo,
+# el resto es mercado) y topamos la ventaja: nada realista supera ~6 puntos.
+# Subir W_MODEL = mas agresivo/mas picks; bajarlo = mas conservador/menos picks.
+W_MODEL = 0.20
+EDGE_CAP = 0.06
+
 
 def _demo_bets():
     """Set de ejemplo fijo (fallback cuando no hay conexión a la agenda real de la MLB)."""
@@ -139,25 +148,32 @@ def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport
             offense = offense_agent.get_offense_adjustment(home, away)
             park = weather["park_factor"]
 
-            # Carreras esperadas (para totales y Monte Carlo) desde xERA * park
-            exp_home = clamp(round(as_["xera"] * park * (1 + offense["adjustment"]), 2), 2.8, 6.8)
-            exp_away = clamp(round(hs["xera"] * park, 2), 2.8, 6.8)
+            # Carreras esperadas (para totales y Monte Carlo). El abridor lanza ~55%
+            # del juego; el resto es bullpen + lo que anota cualquier lineup, cercano
+            # a la media de liga (~4.30 c/equipo). Igualar las carreras del equipo al
+            # xERA de 9 innings del abridor rival sobredimensionaba a los estelares.
+            runs_vs = lambda x_starter: 0.55 * x_starter + 0.45 * 4.30
+            exp_home = clamp(round(runs_vs(as_["xera"]) * park * (1 + offense["adjustment"]), 2), 2.6, 7.0)
+            exp_away = clamp(round(runs_vs(hs["xera"]) * park, 2), 2.6, 7.0)
             sim = mc.simulate_game(exp_home, exp_away)
 
             # Prob del MODELO = Monte Carlo (carreras esperadas reales) + ajustes de agentes
             model_home = clamp(0.5 * sim["p_home"] + 0.5 * base_p + weather["adjustment"] + offense["adjustment"], 0.05, 0.95)
             exp_home, exp_away = sim["exp_runs_home"], sim["exp_runs_away"]
 
-            # Probabilidades por mercado con la fórmula SIN CAMBIOS. Las cuotas planas
-            # aquí solo sirven para obtener las probabilidades; el edge se recalcula abajo
-            # con cuotas reales (si hay API key) o estimadas de forma realista.
-            # Linea REAL de totales de la casa para este partido (7.5, 9.0, 10.5...).
-            # Sin cuotas reales se usa la linea base de la liga: 8.5 esta calibrado
-            # para MLB y en ligas mas anotadoras convierte cualquier Over en una
-            # apuesta ganadora por construccion (en LMB el 59% de los partidos
-            # supera 8.5). Quien llama pasa la base; el defecto no cambia nada.
+            # Linea REAL de totales de la casa (7.5, 9.0, 10.5...). Sin cuotas reales
+            # se usa la linea base de la liga (8.5 en MLB).
             od_pre = real_odds.get(f"{away} @ {home}", {})
             linea_total = float(od_pre.get("total_line") or linea_por_defecto)
+
+            # ANCLAJE AL MERCADO (ML): el precio de la casa ya incorpora a los
+            # abridores. Antes de elegir el pick, encogemos la prob del modelo hacia
+            # el precio real de-vig, para que el LADO y la magnitud sean coherentes
+            # con lo que paga la casa (evita diferir 20 puntos por ver solo el ERA).
+            _ho, _ao = od_pre.get("home_odds"), od_pre.get("away_odds")
+            if _ho and _ao:
+                p_home_mkt = (1.0 / float(_ho)) / (1.0 / float(_ho) + 1.0 / float(_ao))
+                model_home = clamp(W_MODEL * model_home + (1.0 - W_MODEL) * p_home_mkt, 0.05, 0.95)
 
             _b, markets, _scores = RankingEngine.evaluate_all_markets(
                 {"home_team": home, "away_team": away}, model_home,
@@ -179,16 +195,24 @@ def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport
                 p = float(m["prob"])
                 if m["market"] == "Moneyline" and real_ml:
                     o = clamp(float(real_ml), 1.05, 8.0)
-                    m["real"] = True
+                    m["real"] = True   # ML ya viene anclado via model_home
                 elif m["market"] == "Total" and real_over and real_under:
                     o = clamp(float(real_under if under_side else real_over), 1.05, 8.0)
                     m["real"] = True
+                    # Ancla el Total al precio real de-vig del lado elegido.
+                    o_opp = float(real_over if under_side else real_under)
+                    p_mkt = (1.0 / o) / (1.0 / o + 1.0 / o_opp)
+                    p = W_MODEL * p + (1.0 - W_MODEL) * p_mkt
                 else:  # F5 (o cualquiera sin cuota real) -> cuota estimada
                     lean = _market_lean(gid, m["market"])
                     o = round(1.0 / clamp(p * (1.0 - lean), 0.05, 0.97), 2)
                     m["real"] = False
+                # Tope de ventaja: nada realista supera ~EDGE_CAP puntos vs el mercado.
+                # Reescribimos la prob para que sea coherente con el edge topado.
+                edge = max(-EDGE_CAP, min(EDGE_CAP, p - 1.0 / o))
+                m["prob"] = round(edge + 1.0 / o, 4)
                 m["odds"] = round(o, 2)
-                m["edge"] = round(p - 1.0 / o, 4)
+                m["edge"] = round(edge, 4)
 
             # SELECCION DEL PICK: "el mas seguro" = mayor probabilidad del modelo,
             # pero SOLO entre mercados con cuota REAL (ML y Total). Se excluye F5 de
