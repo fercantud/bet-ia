@@ -2146,6 +2146,26 @@ def render_resultados():
             except Exception as e:
                 st.error(f"No se pudo leer el archivo: {e}")
 
+    # ---- Eliminar un día del historial ----
+    # El disco de Cloud es la única copia del historial en runtime; esto permite
+    # borrar una jornada completa (p. ej. picks de un modelo viejo) sin tocar el
+    # resto. El saldo se recalcula solo a partir de lo que queda.
+    dias_disp = sorted({str(b.get("date", ""))[:10] for b in _read_history_file()
+                        if b.get("date")}, reverse=True)
+    if dias_disp:
+        with st.expander("🗑️ Eliminar un día del historial"):
+            st.caption("Borra TODAS las apuestas de una fecha. El saldo acumulado se "
+                       "recalcula solo. Descarga primero un respaldo si quieres poder deshacer.")
+            dsel = st.selectbox("Fecha a eliminar", dias_disp, key="del_day")
+            n_dia = sum(1 for b in _read_history_file() if str(b.get("date", "")).startswith(dsel))
+            confirmar = st.checkbox(f"Confirmo eliminar las {n_dia} apuestas del {dsel}", key="del_day_ok")
+            if st.button("Eliminar este día", type="secondary", key="del_day_btn", disabled=not confirmar):
+                todos = _read_history_file()
+                quedan = [b for b in todos if not str(b.get("date", "")).startswith(dsel)]
+                _write_history_file(quedan)
+                st.success(f"Eliminadas {len(todos) - len(quedan)} apuestas del {dsel}.")
+                st.rerun()
+
     # ---- Ajuste manual (para partidos aún no finalizados) ----
     pending = hist[hist["result"] == "PENDING"]
     if len(pending):
