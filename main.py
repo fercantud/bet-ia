@@ -1,13 +1,25 @@
 import random
 
-# --- Calibracion frente al mercado -----------------------------------------
-# El precio de la casa YA incorpora a los abridores; un modelo que solo ve ERA
-# no puede diferir 20 puntos del mercado sin estar equivocado. Encogemos la
-# probabilidad del modelo hacia el precio real de-vig (W_MODEL = peso del modelo,
-# el resto es mercado) y topamos la ventaja: nada realista supera ~6 puntos.
-# Subir W_MODEL = mas agresivo/mas picks; bajarlo = mas conservador/menos picks.
-W_MODEL = 0.20
-EDGE_CAP = 0.06
+# --- Parametros del motor ---------------------------------------------------
+# Simulaciones Monte Carlo por partido. Mas = probabilidades mas estables (menos
+# ruido de muestreo), a costa de tiempo. 150k es holgado para MLB.
+MC_SIMS = 150000
+
+# Calibracion frente al mercado. El modelo ahora mira fuerza de equipo real, asi que
+# puede diferir del precio con fundamento. Anclaje LIGERO: manda el modelo (W_MODEL)
+# y el mercado solo lo tira un poco hacia el precio de-vig; el tope (EDGE_CAP) es la
+# red de seguridad que impide los edges imposibles del modelo viejo (+56%).
+#   W_MODEL alto  -> mas picks, mas agresivo (confia en el modelo)
+#   W_MODEL bajo  -> menos picks, mas pegado al mercado (mas conservador)
+W_MODEL = 0.75
+EDGE_CAP = 0.08
+
+# Aprobacion de picks (perfil INTERMEDIO). Con el modelo mas inteligente + anclaje
+# moderado, contra cuotas reales salen ~5-8 picks con EV POSITIVO de verdad (no hace
+# falta tolerar EV negativo). Para mas volumen: bajar MIN_EV (p. ej. -0.02 mete los
+# marginales). Para menos: subir MIN_SCORE. El stake se gradua por Score.
+MIN_EV = 0.0
+MIN_SCORE = 58
 
 
 def _demo_bets():
@@ -111,9 +123,16 @@ def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport
         return []
 
     prob_engine = ProbabilityEngine()
-    mc = MonteCarloEngine(2000)
+    mc = MonteCarloEngine(MC_SIMS)
     weather_agent = WeatherAgent()
     offense_agent = OffenseAgent()
+    try:
+        team_str = fetcher.get_team_strength()   # fuerza REAL de equipo (por id)
+    except Exception:
+        team_str = {}
+    # log5: combina dos prob. de victoria "vs promedio" en una prob. cabeza a cabeza
+    log5 = lambda ph, pa: ((ph * (1 - pa)) /
+                           (ph * (1 - pa) + (1 - ph) * pa)) if 0 < ph < 1 and 0 < pa < 1 else 0.5
     try:
         # Ligas sin mercado publicado (LMB) van con cuotas estimadas.
         real_odds = OddsDataFetcher(sport=odds_sport).get_moneyline_odds() if con_cuotas_reales else {}
@@ -141,24 +160,44 @@ def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport
             ap = PitcherStats(name="A", era=as_["era"], xera=as_["xera"], whip=as_["whip"], k_pct=as_["k_pct"], bb_pct=as_["bb_pct"])
             mi = MatchupInput(game_id=str(g.get("game_id", "0")), home_pitcher=hp, away_pitcher=ap)
 
-            # Prob base (solo pitchers) = referencia de "mercado"
+            # Prob base del duelo de abridores (xERA + WHIP + comando)
             base_p = prob_engine.estimate_home_win_prob(mi)
 
             weather = weather_agent.analyze_weather(home)
-            offense = offense_agent.get_offense_adjustment(home, away)
+            offense = offense_agent.get_offense_adjustment(home, away)   # texto/score
             park = weather["park_factor"]
 
-            # Carreras esperadas (para totales y Monte Carlo). El abridor lanza ~55%
-            # del juego; el resto es bullpen + lo que anota cualquier lineup, cercano
-            # a la media de liga (~4.30 c/equipo). Igualar las carreras del equipo al
-            # xERA de 9 innings del abridor rival sobredimensionaba a los estelares.
-            runs_vs = lambda x_starter: 0.55 * x_starter + 0.45 * 4.30
-            exp_home = clamp(round(runs_vs(as_["xera"]) * park * (1 + offense["adjustment"]), 2), 2.6, 7.0)
-            exp_away = clamp(round(runs_vs(hs["xera"]) * park, 2), 2.6, 7.0)
+            # --- Sub-modelos que combina el EnsembleEngine (vision del modelo) ---
+            # OFENSA/EQUIPO: fuerza REAL de temporada (win% via log5) + carreras/juego.
+            # Antes era 108/98 fijo para todos; ahora distingue equipos buenos de malos,
+            # que es lo que el mercado sabe y el ERA del abridor no dice.
+            sh = team_str.get(g.get("home_id", 0), {})
+            sa = team_str.get(g.get("away_id", 0), {})
+            p_offense = log5(sh.get("pct", 0.5), sa.get("pct", 0.5))
+            off_home, off_away = sh.get("rpg", 4.30), sa.get("rpg", 4.30)
+
+            # Carreras esperadas = 50% run-prevention del abridor rival (+bullpen de
+            # liga) y 50% ataque REAL del propio equipo, ajustado por parque.
+            runs_allowed = lambda opp_xera: 0.55 * opp_xera + 0.45 * 4.30
+            exp_home = clamp(round((0.5 * runs_allowed(as_["xera"]) + 0.5 * off_home) * park, 2), 2.6, 7.5)
+            exp_away = clamp(round((0.5 * runs_allowed(hs["xera"]) + 0.5 * off_away) * park, 2), 2.6, 7.5)
             sim = mc.simulate_game(exp_home, exp_away)
 
-            # Prob del MODELO = Monte Carlo (carreras esperadas reales) + ajustes de agentes
-            model_home = clamp(0.5 * sim["p_home"] + 0.5 * base_p + weather["adjustment"] + offense["adjustment"], 0.05, 0.95)
+            # PITCHING: prob del duelo de abridores + Monte Carlo de carreras
+            p_pitching = clamp(0.5 * base_p + 0.5 * sim["p_home"], 0.05, 0.95)
+            # BULLPEN: diferencia de WHIP de los abridores como proxy de traficos
+            p_bullpen = clamp(0.5 + (as_["whip"] - hs["whip"]) * 0.20, 0.30, 0.70)
+            # PARQUE/CLIMA: pequeno empujon local
+            p_weather = clamp(0.5 + weather["adjustment"] + (park - 1.0) * 0.10, 0.35, 0.65)
+
+            # Ensemble ponderado de sub-modelos con DEGRADACION: se combinan solo los
+            # que traen informacion y se renormalizan los pesos. Si no hay fuerza de
+            # equipo (p. ej. sin standings), manda el pitcheo en vez de diluirse a 0.5.
+            subs = [(p_pitching, 0.45), (p_bullpen, 0.15), (p_weather, 0.10)]
+            if sh and sa:                                   # fuerza de equipo disponible
+                subs.append((p_offense, 0.30))
+            wsum = sum(w for _, w in subs)
+            model_home = clamp(sum(p * w for p, w in subs) / wsum, 0.05, 0.95)
             exp_home, exp_away = sim["exp_runs_home"], sim["exp_runs_away"]
 
             # Linea REAL de totales de la casa (7.5, 9.0, 10.5...). Sin cuotas reales
@@ -319,27 +358,28 @@ def rank_bets(raw_bets):
     for idx, bet in enumerate(sorted_bets, 1):
         bet['rank'] = idx
 
-        # Asignación de Stake e indicadores visuales según Score y EV
-        if bet['ev'] > 0:
-            if bet['score'] >= 85:
+        # Asignación de Stake e indicadores visuales según Score y EV. Perfil
+        # intermedio: aprueba con ventaja marginal (MIN_EV) y gradua por Score.
+        if bet['ev'] > MIN_EV and bet['score'] >= MIN_SCORE:
+            if bet['score'] >= 82 and bet['ev'] > 0:
                 stake = "30%"
                 tag = "🔥 ELITE"
-            elif bet['score'] >= 75:
-                stake = "20%" if bet['score'] >= 80 else "10%"
+            elif bet['score'] >= 74:
+                stake = "20%"
                 tag = "✅ VALUE"
-            elif bet['score'] >= 65:
+            elif bet['score'] >= 66:
                 stake = "10%"
                 tag = "⚠️ MOD"
             else:
-                stake = "0%"
-                tag = "🚫 NO"
+                stake = "10%"
+                tag = "🟡 LEAN"
         else:
             stake = "0%"
             tag = "🚫 NO BET"
 
         bet['stake'] = stake
         bet['tag'] = tag
-        bet['approved'] = bet['ev'] > 0 and bet['score'] >= 65
+        bet['approved'] = bet['ev'] > MIN_EV and bet['score'] >= MIN_SCORE
 
     return sorted_bets
 

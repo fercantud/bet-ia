@@ -60,10 +60,15 @@ class MLBDataFetcher:
                 away_pitcher_id = game_data.get('teams', {}).get('away', {}).get('probablePitcher', {}).get('id', 0)
                 home_pitcher_id = game_data.get('teams', {}).get('home', {}).get('probablePitcher', {}).get('id', 0)
 
+                away_id = game_data.get('teams', {}).get('away', {}).get('team', {}).get('id', 0)
+                home_id = game_data.get('teams', {}).get('home', {}).get('team', {}).get('id', 0)
+
                 games.append({
                     "game_id": str(game_data.get('gamePk')),
                     "away_team": away_team,
                     "home_team": home_team,
+                    "away_id": away_id,
+                    "home_id": home_id,
                     "away_pitcher_id": away_pitcher_id,
                     "home_pitcher_id": home_pitcher_id,
                     "pitchers_confirmed": bool(away_pitcher_id and home_pitcher_id)
@@ -146,6 +151,43 @@ class MLBDataFetcher:
             return games
         except Exception:
             return []
+
+    def get_team_strength(self) -> dict:
+        """Fuerza REAL de cada equipo desde la tabla de posiciones, por team_id.
+
+        Devuelve {team_id: {"pct", "rpg", "rapg", "run_diff_pg"}} — win%, carreras
+        anotadas/permitidas por juego y diferencial por juego. Es lo que el ERA del
+        abridor NO captura: la calidad del lineup y del bullpen a lo largo de la
+        temporada. Cacheado en el fetcher (una llamada por sesion). Degrada a {} si
+        la API no responde: el motor entonces usa fuerza neutral (no rompe nada).
+        """
+        if hasattr(self, "_team_strength_cache"):
+            return self._team_strength_cache
+        out = {}
+        try:
+            temporada = _hoy()[:4]
+            liga = f"leagueId={self.league_id}" if self.league_id else "leagueId=103,104"
+            url = (f"{self.BASE_URL}/standings?{liga}&season={temporada}"
+                   f"&standingsTypes=regularSeason")
+            data = requests.get(url, timeout=6).json()
+            for rec in data.get("records", []):
+                for tr in rec.get("teamRecords", []):
+                    tid = tr.get("team", {}).get("id")
+                    gp = tr.get("gamesPlayed") or 0
+                    if not tid or gp < 10:          # muestra chica: no usar
+                        continue
+                    rs = float(tr.get("runsScored") or 0)
+                    ra = float(tr.get("runsAllowed") or 0)
+                    out[tid] = {
+                        "pct": float(tr.get("winningPercentage") or 0.5),
+                        "rpg": rs / gp,
+                        "rapg": ra / gp,
+                        "run_diff_pg": (rs - ra) / gp,
+                    }
+        except Exception:
+            out = {}
+        self._team_strength_cache = out
+        return out
 
     def get_pitcher_stats(self, pitcher_id: int) -> dict:
         """Fetch en tiempo real de métricas de pitcheo vía MLB API.

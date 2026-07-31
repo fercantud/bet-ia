@@ -28,10 +28,13 @@ class ProbabilityEngine:
         acotado. El bono de comando K%-BB% se conserva pero pesa poco.
         """
         def prevencion(p: "PitcherStats") -> float:
-            # carreras prevenidas vs la liga + pequeño bono de comando (centrado en 10%)
-            return (LEAGUE_XERA - p.xera) + 2.0 * ((p.k_pct - p.bb_pct) - 0.10)
+            # carreras prevenidas vs la liga (xERA) + comando (K%-BB%) + control de
+            # traficos (WHIP, centrado en 1.28). Tres senales del abridor, no solo ERA.
+            return ((LEAGUE_XERA - p.xera)
+                    + 2.0 * ((p.k_pct - p.bb_pct) - 0.10)
+                    + 1.2 * (1.28 - p.whip))
 
         diff = prevencion(matchup.home_pitcher) - prevencion(matchup.away_pitcher)
-        logit = 0.45 * diff + HFA_LOGIT
+        logit = 0.42 * diff + HFA_LOGIT
         p = 1.0 / (1.0 + math.exp(-logit))
-        return round(min(0.66, max(0.34, p)), 4)
+        return round(min(0.70, max(0.30, p)), 4)
