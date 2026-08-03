@@ -21,6 +21,24 @@ EDGE_CAP = 0.08
 MIN_EV = 0.0
 MIN_SCORE = 58
 
+# Niveles de SEGURIDAD calibrados a la realidad de MLB. Un juego es alta varianza:
+# el favorito mas seguro del dia ronda 65-78% de probabilidad real, casi nunca 90%+
+# (un -340 es 77%, no 91%). Umbral de "pick seguro" = 70%.
+SAFE_THRESHOLD = 0.70
+
+
+def nivel_confianza(p):
+    """Prob. real -> nivel de seguridad (calibrado a MLB) e icono."""
+    if p >= 0.78:
+        return ("BLOQUEO TOTAL", "🔒")
+    if p >= 0.74:
+        return ("MUY SEGURO", "🟢")
+    if p >= 0.70:
+        return ("SEGURO", "🟢")
+    if p >= 0.65:
+        return ("ACEPTABLE", "🟡")
+    return ("NO SEGURO", "⚪")
+
 
 def _demo_bets():
     """Set de ejemplo fijo (fallback cuando no hay conexión a la agenda real de la MLB)."""
@@ -303,6 +321,18 @@ def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport
             else:
                 risk = "ALTO"
 
+            # Probabilidades por mercado (para el radar de seguridad y los Top 5).
+            ml_m = next((m for m in markets if m["market"] == "Moneyline"), None)
+            tot_m = next((m for m in markets if m["market"] == "Total"), None)
+            p_ml = round(float(ml_m["prob"]), 4) if ml_m else round(max(model_home, 1 - model_home), 4)
+            ml_side = home if model_home >= 0.5 else away
+            if tot_m and "Under" in tot_m["selection"]:
+                p_under = round(float(tot_m["prob"]), 4); p_over = round(1 - p_under, 4)
+            elif tot_m:
+                p_over = round(float(tot_m["prob"]), 4); p_under = round(1 - p_over, 4)
+            else:
+                p_over = p_under = 0.5
+
             bets.append({
                 "matchup": f"{away} @ {home}",
                 "market": market,
@@ -315,6 +345,11 @@ def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport
                 "confidence": confidence,
                 "score": score,
                 "risk": risk,
+                # --- Radar de seguridad ---
+                "safety": prob_model,          # prob. del pick mas seguro elegido
+                "p_ml": p_ml, "ml_side": ml_side,
+                "p_over": p_over, "p_under": p_under, "total_line": f"{linea_total:g}",
+                "proj_home": round(exp_home), "proj_away": round(exp_away),
                 "pitching": f"Abridores: {home} {hs['era']:.2f} ERA (xERA {hs['xera']:.2f}) vs {away} {as_['era']:.2f} ERA (xERA {as_['xera']:.2f})",
                 "bullpen": f"WHIP abridores {hs['whip']:.2f} (local) vs {as_['whip']:.2f} (visita)",
                 "offense": f"wRC+ estimado {offense['home_wrc']} (local) vs {offense['away_wrc']} (visita)",
@@ -352,34 +387,36 @@ def rank_bets(raw_bets):
     if not raw_bets:
         return []
 
-    # Ordenamiento estricto por: 1) EV positivo, 2) Mayor Score, 3) Mayor Confianza
-    sorted_bets = sorted(raw_bets, key=lambda x: (x['ev'] > 0, x['ev'], x['score'], x['confidence']), reverse=True)
+    # PRIORIDAD: EL PICK MAS SEGURO. Se ordena por PROBABILIDAD real del pick
+    # (no por EV ni por momio). El favorito con mayor probabilidad encabeza, sin
+    # importar la cuota (-150 o -340 da igual: manda la seguridad).
+    sorted_bets = sorted(
+        raw_bets,
+        key=lambda x: (x.get('safety', x.get('prob_model', 0.5)), x.get('confidence', 0), x.get('score', 0)),
+        reverse=True,
+    )
 
     for idx, bet in enumerate(sorted_bets, 1):
         bet['rank'] = idx
+        p = bet.get('safety', bet.get('prob_model', 0.5))
+        nombre, icono = nivel_confianza(p)
+        bet['conf_nivel'] = nombre
+        bet['conf_pct'] = round(p * 100, 1)
 
-        # Asignación de Stake e indicadores visuales según Score y EV. Perfil
-        # intermedio: aprueba con ventaja marginal (MIN_EV) y gradua por Score.
-        if bet['ev'] > MIN_EV and bet['score'] >= MIN_SCORE:
-            if bet['score'] >= 82 and bet['ev'] > 0:
-                stake = "30%"
-                tag = "🔥 ELITE"
-            elif bet['score'] >= 74:
-                stake = "20%"
-                tag = "✅ VALUE"
-            elif bet['score'] >= 66:
-                stake = "10%"
-                tag = "⚠️ MOD"
-            else:
-                stake = "10%"
-                tag = "🟡 LEAN"
+        # Stake por NIVEL DE SEGURIDAD: mas seguro = mas stake (la intuicion del
+        # usuario, aplicada a la probabilidad real, no al momio).
+        if p >= 0.78:
+            stake = "30%"
+        elif p >= 0.74:
+            stake = "20%"
+        elif p >= 0.70:
+            stake = "10%"
         else:
             stake = "0%"
-            tag = "🚫 NO BET"
 
         bet['stake'] = stake
-        bet['tag'] = tag
-        bet['approved'] = bet['ev'] > MIN_EV and bet['score'] >= MIN_SCORE
+        bet['tag'] = f"{icono} {nombre}"
+        bet['approved'] = p >= SAFE_THRESHOLD
 
     return sorted_bets
 
