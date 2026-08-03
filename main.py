@@ -22,20 +22,21 @@ MIN_EV = 0.0
 MIN_SCORE = 58
 
 # Niveles de SEGURIDAD calibrados a la realidad de MLB. Un juego es alta varianza:
-# el favorito mas seguro del dia ronda 65-78% de probabilidad real, casi nunca 90%+
-# (un -340 es 77%, no 91%). Umbral de "pick seguro" = 70%.
-SAFE_THRESHOLD = 0.70
+# el favorito mas seguro del dia ronda 60-75% de probabilidad real, casi nunca 90%+
+# (un -340 es 77%, no 91%). Umbral de "pick seguro" = 60%: casi todos los dias hay
+# al menos un favorito claro, pero se evita apostar juegos de puro volado (<60%).
+SAFE_THRESHOLD = 0.60
 
 
 def nivel_confianza(p):
     """Prob. real -> nivel de seguridad (calibrado a MLB) e icono."""
-    if p >= 0.78:
-        return ("BLOQUEO TOTAL", "🔒")
     if p >= 0.74:
+        return ("BLOQUEO TOTAL", "🔒")
+    if p >= 0.68:
         return ("MUY SEGURO", "🟢")
-    if p >= 0.70:
+    if p >= 0.64:
         return ("SEGURO", "🟢")
-    if p >= 0.65:
+    if p >= 0.60:
         return ("ACEPTABLE", "🟡")
     return ("NO SEGURO", "⚪")
 
@@ -412,12 +413,14 @@ def rank_bets(raw_bets):
 
         # Stake por NIVEL DE SEGURIDAD: mas seguro = mas stake (la intuicion del
         # usuario, aplicada a la probabilidad real, no al momio).
-        if p >= 0.78:
+        if p >= 0.74:
             stake = "30%"
-        elif p >= 0.74:
+        elif p >= 0.68:
             stake = "20%"
-        elif p >= 0.70:
+        elif p >= 0.64:
             stake = "10%"
+        elif p >= 0.60:
+            stake = "5%"
         else:
             stake = "0%"
 

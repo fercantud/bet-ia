@@ -23,7 +23,7 @@ def now_local():
 import pandas as pd
 import streamlit as st
 
-from main import get_analyzed_bets, rank_bets
+from main import get_analyzed_bets, rank_bets, SAFE_THRESHOLD
 from mlb_api import MLBDataFetcher
 
 DB_NAME = "bet_ia_performance.db"          # BD antigua (solo para migrar una vez)
@@ -2247,11 +2247,11 @@ def momio_americano(dec):
 
 
 def _tono_conf(p):
-    if p >= 0.74:
+    if p >= 0.68:
         return "save"
-    if p >= 0.70:
+    if p >= 0.64:
         return "accent"
-    if p >= 0.65:
+    if p >= 0.60:
         return "warn"
     return "neutral"
 
@@ -2297,7 +2297,7 @@ def render_radar():
     g = lambda b, k, d=0.5: b.get(k, d)
     top = bets[0]
     p_top = g(top, "safety", g(top, "prob_model"))
-    seguro = p_top >= 0.70
+    seguro = p_top >= SAFE_THRESHOLD
 
     # --- 🏆 Pick del día (o aviso de que no hay pick seguro) ---
     if seguro:
@@ -2316,7 +2316,7 @@ def render_radar():
     else:
         st.markdown(
             '<div class="rd-hero rd-hero-off"><div class="rd-hero-tag">⚠️ NO EXISTE UN PICK SEGURO PARA HOY</div>'
-            f'<div class="rd-hero-match" style="margin-top:6px;">Ningún juego supera el 70% de probabilidad real. '
+            f'<div class="rd-hero-match" style="margin-top:6px;">Ningún juego supera el {SAFE_THRESHOLD:.0%} de probabilidad real. '
             f'El más seguro disponible: <b>{top["selection"]}</b> ({top["matchup"]}) — '
             f'{p_top:.1%}, {top.get("tag","")}.</div></div>', unsafe_allow_html=True)
 
@@ -2395,12 +2395,12 @@ def render_radar():
     st.markdown(mini, unsafe_allow_html=True)
 
     # --- Resumen ejecutivo (<=10 lineas) ---
-    seguros_n = sum(1 for b in bets if g(b, "safety", g(b, "prob_model")) >= 0.70)
+    seguros_n = sum(1 for b in bets if g(b, "safety", g(b, "prob_model")) >= SAFE_THRESHOLD)
     lineas = []
     if seguro:
         lineas.append(f"🏆 Pick del día: <b>{top['selection']}</b> ({top['matchup']}) — {p_top:.0%}, {top.get('conf_nivel','')}.")
     else:
-        lineas.append("⚠️ Hoy NO hay pick con ≥70% de probabilidad: jornada para pasar o apostar mínimo.")
+        lineas.append(f"⚠️ Hoy NO hay pick con ≥{SAFE_THRESHOLD:.0%} de probabilidad: jornada para pasar o apostar mínimo.")
     lineas.append(f"Se analizaron {len(bets)} juegos; con nivel «Seguro» o mejor: {seguros_n}.")
     lineas.append(f"Más seguro disponible: {top['selection']} ({p_top:.0%}).")
     lineas.append(f"Juego más parejo: {parejo['matchup']} (favorito {g(parejo,'p_ml'):.0%}).")
@@ -2410,7 +2410,7 @@ def render_radar():
         lineas.append(f"Equipo más caliente: {hot[0]} ({hot[1]:.0%}); más frío: {cold[0]} ({cold[1]:.0%}).")
     else:
         lineas.append("Fuerza de equipo: sin standings hoy (modo neutral).")
-    lineas.append("Nota: en MLB un solo juego es alta varianza; «seguro» = 70%+, no 90%+.")
+    lineas.append(f"Nota: en MLB un solo juego es alta varianza; umbral de pick = {SAFE_THRESHOLD:.0%}, no 90%+.")
     page_section("Resumen ejecutivo", "Para apostadores conservadores")
     st.markdown('<div class="rd-exec">' + "".join(f"<p>• {l}</p>" for l in lineas[:10]) + '</div>',
                 unsafe_allow_html=True)
