@@ -1509,10 +1509,11 @@ def build_matchday_rows(games, bets):
                      if g["is_live"] else fmt_start(g["start_utc"])),
             "pick": pick_label(bet) if bet else "",
             "prob": float(bet["prob_model"]) if bet else -1.0,
+            "safety": float(bet.get("safety", bet["prob_model"])) if bet else -1.0,
             "ev": float(bet["ev"]) if bet else -999.0,
         })
-    # Orden: mayor EV primero; los partidos sin pick quedan al final
-    rows.sort(key=lambda r: (-r["ev"], r["game"].get("start_utc") or ""))
+    # Orden: MÁS SEGURO primero (mayor probabilidad); sin pick queda al final
+    rows.sort(key=lambda r: (-r["safety"], r["game"].get("start_utc") or ""))
     return rows
 
 
@@ -1591,7 +1592,7 @@ def render_dashboard():
 
     c = st.columns(4, gap="large")
     stat_tile(c[0], "Partidos analizados", str(len(sorted_bets)), "jornada de hoy", True, "contrast", "fare")
-    stat_tile(c[1], "Picks aprobados", str(len(approved_picks)), "+EV detectado", True, "target", "fare")
+    stat_tile(c[1], "Picks seguros", str(len(approved_picks)), f"≥{SAFE_THRESHOLD:.0%} probabilidad", True, "target", "fare")
     stat_tile(c[2], "En vivo ahora", str(len(live_now)), "marcadores activos", len(live_now) > 0, "radio", "save")
     stat_tile(c[3], "P&L acumulado", mxn(net, signo=True), "pesos netos", net >= 0, "dollar", "warn")
     st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
@@ -1599,15 +1600,16 @@ def render_dashboard():
     tp, dg = st.columns(2, gap="large")
     with tp:
         st.markdown(
-            card_header("Top Pick del Día", top_pick["matchup"], "flame",
-                        badge(top_pick["market"], TONE_MARKET.get(top_pick["market"], "neutral"))
-                        + badge("MLB", "neutral"), hl=True)
+            card_header("Pick Más Seguro del Día", top_pick["matchup"], "flame",
+                        badge(top_pick.get("tag", ""), _tono_conf(top_pick.get("safety", top_pick["prob_model"])))
+                        + badge(top_pick["market"], TONE_MARKET.get(top_pick["market"], "neutral")), hl=True)
             + '<div class="tp-hero"><div class="tp-info">'
             + f'<p style="font-size:30px;font-weight:800;letter-spacing:-.02em;color:rgb(var(--save));margin:0;">'
-            f'{top_pick["ev"]:+.1%} <span style="font-size:12px;font-weight:500;color:rgb(var(--ink2));">EV esperado</span></p>'
+            f'{top_pick.get("safety", top_pick["prob_model"]):.0%} '
+            f'<span style="font-size:12px;font-weight:500;color:rgb(var(--ink2));">Probabilidad · {top_pick.get("conf_nivel","")}</span></p>'
             f'<p style="margin:8px 0 0 0;font-size:13.5px;color:rgb(var(--ink2));">'
-            f'Selección: <b style="color:rgb(var(--ink));">{top_pick["selection"]}</b> · Cuota {top_pick["odds"]:.2f} · '
-            f'Prob. modelo {top_pick["prob_model"]:.1%} · Score {top_pick["score"]}/100 · Confianza {top_pick["confidence"]}/10</p>'
+            f'Selección: <b style="color:rgb(var(--ink));">{top_pick["selection"]}</b> · Momio {momio_americano(top_pick["odds"])} '
+            f'(cuota {top_pick["odds"]:.2f}) · Marcador proy. {top_pick.get("proj_home","-")}-{top_pick.get("proj_away","-")}</p>'
             + '</div>'
             + f'<div class="tp-logo">{pick_logos_html(top_pick, live)}</div></div>'
             + f'<div class="tp-bars">'
@@ -1628,18 +1630,18 @@ def render_dashboard():
             unsafe_allow_html=True,
         )
     with dg:
-        roi = "+4.2%" if approved_picks else "0.0%"
-        status = "Oportunidades encontradas" if approved_picks else "Sin valor detectado"
-        st_tone = "save" if approved_picks else "fare"
+        p_top = top_pick.get("safety", top_pick["prob_model"])
+        status = "Pick seguro encontrado" if approved_picks else "Sin pick seguro hoy"
+        st_tone = "save" if approved_picks else "warn"
         wr = (settled["result"].eq("WON").sum() / len(settled) * 100) if len(settled) else 0.0
         st.markdown(
             card_header("Chief Tipster Decision", "Director general del sistema multi-agente", "crown",
                         badge(status, st_tone))
             + f'<p style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:rgb(var(--ink));margin:0;line-height:1.1;">'
-            f'{len(approved_picks)} <span style="font-size:11.5px;font-weight:500;color:rgb(var(--ink2));">picks aprobados hoy</span></p>'
+            f'{len(approved_picks)} <span style="font-size:11.5px;font-weight:500;color:rgb(var(--ink2));">picks seguros hoy</span></p>'
             f'<div class="ct-grid">'
             f'<div><p>Mejor mercado</p><b>{top_pick["market"]}</b></div>'
-            f'<div><p>ROI esperado</p><b style="color:rgb(var(--save));">{roi}</b></div>'
+            f'<div><p>Prob. del más seguro</p><b style="color:rgb(var(--save));">{p_top:.0%}</b></div>'
             f'<div><p>Win rate histórico</p><b>{wr:.0f}%</b></div>'
             f'<div><p>Riesgo global</p><b style="color:rgb(var(--save));">Controlado</b></div>'
             f'</div></div></div>',
@@ -1722,17 +1724,19 @@ def live_table_row(r, records=None):
         marc_sub = "Por comenzar"
 
     if bet:
-        ev_cls = "pos" if bet["ev"] > 0 else "neg"
         pick_html = (f'<span class="pick-nm">{r["pick"]}</span>'
                      f'<span class="pick-mkt">{MARKET_LABEL.get(bet["market"], bet["market"])}</span>')
-        prob_td, odds_td = f'{bet["prob_model"]:.0%}', f'{bet["odds"]:.2f}'
-        ev_td = f'<span class="ev {ev_cls}">{bet["ev"]:+.1%}</span>'
+        p_seg = bet.get("safety", bet["prob_model"])
+        prob_td, odds_td = f'{p_seg:.0%}', f'{momio_americano(bet["odds"])}'
+        # Confianza: emoji del nivel (color) + nivel completo en tooltip.
+        emoji = (bet.get("tag", "").split(" ", 1)[0]) or "•"
+        conf_td = f'<span title="{bet.get("conf_nivel","")} · {p_seg:.0%}">{emoji}</span>'
         stake_val = str(bet.get("stake", "0%"))
         stk_cls = "off" if stake_val.strip() in ("0%", "0", "") else "on"
         stake_td = f'<span class="stk {stk_cls}">{stake_val}</span>'
     else:
         pick_html = '<span class="vacio">—</span>'
-        prob_td = odds_td = ev_td = stake_td = '<span class="vacio">—</span>'
+        prob_td = odds_td = conf_td = stake_td = '<span class="vacio">—</span>'
 
     vivo = live_pick_status(bet, g)
     res_cls = {"WON": " v-win", "LOST": " v-lose", "PUSH": " v-tie"}.get(r["result"], "")
@@ -1759,7 +1763,7 @@ def live_table_row(r, records=None):
         f'<span class="c-pick">{pick_html}</span>'
         f'<span class="c-prob num">{prob_td}</span>'
         f'<span class="c-cuota num">{odds_td}</span>'
-        f'<span class="c-ev num">{ev_td}</span>'
+        f'<span class="c-ev num">{conf_td}</span>'
         f'<span class="c-stake num">{stake_td}</span>'
         f'<span class="c-inicio">{start_countdown(g)}</span>'
         f'<span class="c-det">{resultado_dot}<span class="lv-chev">{svg("chevron", 15)}</span></span>'
@@ -1814,7 +1818,7 @@ def render_en_vivo():
 
     elapsed = int((now_local() - st.session_state.lv_last_fetch).total_seconds())
     st.markdown(
-        f'<p class="lv-status">{svg("target", 13)} Ordenados por EV'
+        f'<p class="lv-status">{svg("target", 13)} Ordenados por seguridad'
         f'<span class="lv-dot">·</span>{svg("info", 13)} Actualizado hace {elapsed}s'
         f'<span class="lv-dot">·</span>{now_local().strftime("%d/%m/%Y")}</p>',
         unsafe_allow_html=True)
@@ -1848,7 +1852,7 @@ def render_en_vivo():
         '<span class="c-hora">Hora <small>Local</small></span><span class="c-est">Estado</span>'
         '<span class="c-part">Partido</span><span class="c-marc">Marcador</span>'
         '<span class="c-pick">Pick IA</span><span class="c-prob num">Prob.</span>'
-        '<span class="c-cuota num">Cuota</span><span class="c-ev num">EV</span>'
+        '<span class="c-cuota num">Momio</span><span class="c-ev num">Conf.</span>'
         '<span class="c-stake num">Stake</span>'
         '<span class="c-inicio">Inicio</span><span class="c-det">Detalle</span></div>'
         + ("".join(live_table_row(r, records) for r in md_rows) if md_rows else
