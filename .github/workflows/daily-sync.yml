@@ -1,0 +1,27 @@
+name: Registro diario de picks
+
+# Abre la app cada dia para que Streamlit ejecute el registro de la jornada
+# (sync_today_picks). Sin esto, un dia que nadie abra la app queda sin registrar.
+on:
+  schedule:
+    - cron: '0 15 * * *'   # ~10:00 hora del Centro (CDT, verano)
+    - cron: '0 18 * * *'   # ~13:00 hora del Centro (atrapa abridores anunciados tarde)
+  workflow_dispatch: {}      # permite dispararlo a mano desde la pestana Actions
+
+jobs:
+  visitar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Traer el repo (para el script visit.js)
+        uses: actions/checkout@v4
+
+      - name: Preparar navegador headless
+        run: |
+          npm init -y
+          npm install playwright@1.48.0
+          npx playwright install --with-deps chromium
+
+      - name: Abrir la app y registrar la jornada
+        run: node .github/scripts/visit.js
+        env:
+          APP_URL: https://fc-betia.streamlit.app/
