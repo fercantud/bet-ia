@@ -2171,6 +2171,20 @@ def render_resultados():
                 st.success(f"Eliminadas {len(todos) - len(quedan)} apuestas del {dsel}.")
                 st.rerun()
 
+    # ---- Limpiar TODO el historial (borron y cuenta nueva) ----
+    total_hist = len(_read_history_file())
+    if total_hist:
+        with st.expander("🧹 Limpiar TODO el historial"):
+            st.caption("Deja Resultados en blanco: borra las {n} apuestas de esta liga. "
+                       "Es IRREVERSIBLE — descarga primero el respaldo de arriba si quieres "
+                       "poder deshacer.".format(n=total_hist))
+            txt = st.text_input('Para confirmar, escribe BORRAR', key="wipe_txt", placeholder="BORRAR")
+            if st.button("🧹 Limpiar todo ahora", type="secondary", key="wipe_btn",
+                         disabled=(txt.strip().upper() != "BORRAR")):
+                _write_history_file([])
+                st.success(f"Historial vaciado: se borraron {total_hist} apuestas.")
+                st.rerun()
+
     # ---- Ajuste manual (para partidos aún no finalizados) ----
     pending = hist[hist["result"] == "PENDING"]
     if len(pending):
