@@ -350,6 +350,13 @@ def _build_bets_from_real_games(fetcher=None, con_cuotas_reales=True, odds_sport
                 "p_ml": p_ml, "ml_side": ml_side,
                 "p_over": p_over, "p_under": p_under, "total_line": f"{linea_total:g}",
                 "proj_home": round(exp_home), "proj_away": round(exp_away),
+                # Run Line -1.5 por lado (prob. de ganar por 2+)
+                "p_rl_home": round(float(sim.get("p_home_rl", 0.0)), 4),
+                "p_rl_away": round(float(sim.get("p_away_rl", 0.0)), 4),
+                # Datos para extras (pitcher / equipo del dia, caliente/frio)
+                "home_team": home, "away_team": away,
+                "home_xera": hs["xera"], "away_xera": as_["xera"],
+                "home_pct": sh.get("pct"), "away_pct": sa.get("pct"),
                 "pitching": f"Abridores: {home} {hs['era']:.2f} ERA (xERA {hs['xera']:.2f}) vs {away} {as_['era']:.2f} ERA (xERA {as_['xera']:.2f})",
                 "bullpen": f"WHIP abridores {hs['whip']:.2f} (local) vs {as_['whip']:.2f} (visita)",
                 "offense": f"wRC+ estimado {offense['home_wrc']} (local) vs {offense['away_wrc']} (visita)",

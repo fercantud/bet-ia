@@ -1521,6 +1521,7 @@ def build_matchday_rows(games, bets):
 # ---------------------------------------------------------------------------
 PAGES = [
     ("space_dashboard", "grid", "Dashboard"),
+    ("target", "target", "Radar Seguro"),
     ("sensors", "sensors", "En vivo"),
     ("receipt_long", "receipt", "Resultados"),
     ("leaderboard", "trophy", "Rendimiento"),
@@ -2232,6 +2233,190 @@ def render_rendimiento():
 
 
 # ---------------------------------------------------------------------------
+# PÁGINA: Radar de Seguridad — el PICK MÁS SEGURO del día (probabilidad, no valor)
+# ---------------------------------------------------------------------------
+def momio_americano(dec):
+    """Cuota decimal -> momio americano (texto)."""
+    try:
+        dec = float(dec)
+    except Exception:
+        return "—"
+    if dec >= 2.0:
+        return f"+{round((dec - 1) * 100)}"
+    return f"-{round(100 / (dec - 1))}" if dec > 1.0 else "—"
+
+
+def _tono_conf(p):
+    if p >= 0.74:
+        return "save"
+    if p >= 0.70:
+        return "accent"
+    if p >= 0.65:
+        return "warn"
+    return "neutral"
+
+
+_RADAR_CSS = """
+<style>
+.rd-hero{ border-radius:14px; padding:18px 20px; margin:4px 0 18px 0;
+  background:linear-gradient(135deg, rgb(var(--save)/0.16), rgb(var(--accent)/0.10));
+  border:1px solid rgb(var(--save)/0.35); }
+.rd-hero.rd-hero-off{ background:rgb(var(--warn)/0.10); border-color:rgb(var(--warn)/0.4); }
+.rd-hero-tag{ font-size:12px; font-weight:800; letter-spacing:.06em; color:rgb(var(--save)); }
+.rd-hero.rd-hero-off .rd-hero-tag{ color:rgb(var(--warn)); }
+.rd-hero-sel{ font-size:26px; font-weight:800; color:rgb(var(--ink)); margin-top:4px; letter-spacing:-.01em; }
+.rd-hero-match{ font-size:13px; color:rgb(var(--ink2)); margin-top:2px; }
+.rd-hero-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin-top:14px; }
+.rd-hero-grid p{ margin:0 !important; font-size:10.5px !important; text-transform:uppercase; letter-spacing:.05em; color:rgb(var(--ink2)); }
+.rd-hero-grid b{ font-size:18px; font-weight:800; color:rgb(var(--ink)); }
+.rd-hero-note{ margin-top:12px; font-size:11.5px; color:rgb(var(--ink2)); border-top:1px dashed rgb(var(--line)); padding-top:8px; }
+.rd-top{ border:1px solid rgb(var(--line)); border-radius:12px; padding:12px 14px; margin-bottom:12px; background:rgb(var(--surface2)/0.4); }
+.rd-top h4{ margin:0 0 8px 0; font-size:13px; font-weight:700; color:rgb(var(--ink)); }
+.rd-top ol{ margin:0; padding-left:18px; }
+.rd-top li{ font-size:12px; color:rgb(var(--ink2)); margin:4px 0; }
+.rd-top li b{ color:rgb(var(--ink)); font-variant-numeric:tabular-nums; }
+.rd-mini{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin:6px 0 16px 0; }
+.rd-mini .c{ border:1px solid rgb(var(--line)); border-radius:10px; padding:10px 12px; background:rgb(var(--surface2)/0.4); }
+.rd-mini .c p{ margin:0 !important; font-size:10px !important; text-transform:uppercase; letter-spacing:.05em; color:rgb(var(--ink2)); }
+.rd-mini .c b{ font-size:14px; color:rgb(var(--ink)); }
+.rd-exec{ border-left:3px solid rgb(var(--accent)); padding:4px 0 4px 14px; margin-top:4px; }
+.rd-exec p{ margin:5px 0 !important; font-size:12.5px !important; color:rgb(var(--ink2)); line-height:1.5 !important; }
+</style>
+"""
+
+
+def render_radar():
+    page_section("Radar de Seguridad",
+                 "Del pick MÁS SEGURO al más riesgoso · probabilidad real, no momio · calibrado a MLB")
+    bets = sorted_bets
+    if not bets:
+        _sin_jornada()
+        return
+    st.markdown(_RADAR_CSS, unsafe_allow_html=True)
+
+    g = lambda b, k, d=0.5: b.get(k, d)
+    top = bets[0]
+    p_top = g(top, "safety", g(top, "prob_model"))
+    seguro = p_top >= 0.70
+
+    # --- 🏆 Pick del día (o aviso de que no hay pick seguro) ---
+    if seguro:
+        st.markdown(
+            '<div class="rd-hero"><div class="rd-hero-tag">🏆 PICK MÁS SEGURO DEL DÍA</div>'
+            f'<div class="rd-hero-sel">{top["selection"]}</div>'
+            f'<div class="rd-hero-match">{top["matchup"]} · {top["market"]}</div>'
+            '<div class="rd-hero-grid">'
+            f'<div><p>Probabilidad</p><b>{p_top:.1%}</b></div>'
+            f'<div><p>Confianza</p><b>{top.get("tag","")}</b></div>'
+            f'<div><p>Momio</p><b>{momio_americano(top["odds"])}</b></div>'
+            f'<div><p>Marcador proy.</p><b>{g(top,"proj_home",0)}-{g(top,"proj_away",0)}</b></div>'
+            '</div>'
+            f'<div class="rd-hero-note">{top.get("pitching","")}<br>{top.get("movement","")}</div>'
+            '</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(
+            '<div class="rd-hero rd-hero-off"><div class="rd-hero-tag">⚠️ NO EXISTE UN PICK SEGURO PARA HOY</div>'
+            f'<div class="rd-hero-match" style="margin-top:6px;">Ningún juego supera el 70% de probabilidad real. '
+            f'El más seguro disponible: <b>{top["selection"]}</b> ({top["matchup"]}) — '
+            f'{p_top:.1%}, {top.get("tag","")}.</div></div>', unsafe_allow_html=True)
+
+    # --- Tabla ordenada por seguridad ---
+    filas = ""
+    for b in bets:
+        p = g(b, "safety", g(b, "prob_model"))
+        filas += (
+            f'<tr><td class="num">{b.get("rank","")}</td><td>{b["matchup"]}</td>'
+            f'<td>{b["market"]}</td><td class="rt-sel">{b["selection"]}</td>'
+            f'<td class="num">{momio_americano(b["odds"])}</td>'
+            f'<td class="num">{p:.1%}</td>'
+            f'<td>{badge(b.get("conf_nivel","—"), _tono_conf(p))}</td></tr>')
+    st.markdown(
+        '<div class="rt-wrap"><table class="rt-table"><thead><tr>'
+        '<th class="num">#</th><th>Partido</th><th>Mercado</th><th>Selección</th>'
+        '<th class="num">Momio</th><th class="num">Prob.</th><th>Confianza</th>'
+        '</tr></thead><tbody>' + filas + '</tbody></table></div>', unsafe_allow_html=True)
+
+    # --- Top 5 por mercado ---
+    def top5(titulo, pares):
+        items = "".join(f'<li><b>{p:.1%}</b> {txt}</li>'
+                        for p, txt in sorted(pares, key=lambda x: x[0], reverse=True)[:5])
+        return f'<div class="rd-top"><h4>{titulo}</h4><ol>{items}</ol></div>'
+
+    rl_pares = []
+    for b in bets:
+        fav_home = b.get("ml_side") == b.get("home_team")
+        fav_rl = g(b, "p_rl_home", 0) if fav_home else g(b, "p_rl_away", 0)
+        dog = b.get("away_team", "") if fav_home else b.get("home_team", "")
+        rl_pares.append((1 - fav_rl, f'{dog} +1.5 · {b["matchup"]}'))
+
+    st.markdown("### Top 5 por mercado")
+    a, b_ = st.columns(2)
+    a.markdown(top5("🛡️ Más Seguros", [(g(b, "safety", g(b, "prob_model")),
+               f'{b["selection"]} · {b["matchup"]}') for b in bets]), unsafe_allow_html=True)
+    b_.markdown(top5("💰 Moneyline", [(g(b, "p_ml"), f'{b.get("ml_side","")} · {b["matchup"]}')
+               for b in bets]), unsafe_allow_html=True)
+    c, d = st.columns(2)
+    c.markdown(top5("📈 Over", [(g(b, "p_over"), f'Over {b.get("total_line","")} · {b["matchup"]}')
+               for b in bets]), unsafe_allow_html=True)
+    d.markdown(top5("📉 Under", [(g(b, "p_under"), f'Under {b.get("total_line","")} · {b["matchup"]}')
+               for b in bets]), unsafe_allow_html=True)
+    e, _ = st.columns(2)
+    e.markdown(top5("🏃 Run Line (+1.5 más seguro)", rl_pares), unsafe_allow_html=True)
+
+    # --- Extras ---
+    parejo = min(bets, key=lambda b: abs(g(b, "p_ml") - 0.5))
+    pitchers = []
+    for b in bets:
+        pitchers.append((g(b, "home_xera", 9), b.get("home_team", ""), b["matchup"]))
+        pitchers.append((g(b, "away_xera", 9), b.get("away_team", ""), b["matchup"]))
+    mejor_p = min(pitchers, key=lambda x: x[0]) if pitchers else None
+    equipos = {}
+    for b in bets:
+        if b.get("home_pct") is not None:
+            equipos[b.get("home_team", "")] = b["home_pct"]
+        if b.get("away_pct") is not None:
+            equipos[b.get("away_team", "")] = b["away_pct"]
+    hot = max(equipos.items(), key=lambda x: x[1]) if equipos else None
+    cold = min(equipos.items(), key=lambda x: x[1]) if equipos else None
+
+    st.markdown("### Destacados")
+    mini = (
+        '<div class="rd-mini">'
+        f'<div class="c"><p>⚖️ Juego más parejo</p><b>{parejo["matchup"]}</b><br>'
+        f'<span style="font-size:11px;color:rgb(var(--ink2))">favorito {g(parejo,"p_ml"):.0%}</span></div>'
+        f'<div class="c"><p>🎯 Pitcher del día (mejor xERA)</p>'
+        f'<b>{mejor_p[1] if mejor_p else "—"}</b><br>'
+        f'<span style="font-size:11px;color:rgb(var(--ink2))">xERA {mejor_p[0]:.2f}</span></div>'
+        f'<div class="c"><p>🔥 Equipo más caliente</p><b>{hot[0] if hot else "N/D"}</b><br>'
+        f'<span style="font-size:11px;color:rgb(var(--ink2))">{f"{hot[1]:.0%} win" if hot else "sin standings hoy"}</span></div>'
+        f'<div class="c"><p>🧊 Equipo más frío</p><b>{cold[0] if cold else "N/D"}</b><br>'
+        f'<span style="font-size:11px;color:rgb(var(--ink2))">{f"{cold[1]:.0%} win" if cold else "sin standings hoy"}</span></div>'
+        '</div>')
+    st.markdown(mini, unsafe_allow_html=True)
+
+    # --- Resumen ejecutivo (<=10 lineas) ---
+    seguros_n = sum(1 for b in bets if g(b, "safety", g(b, "prob_model")) >= 0.70)
+    lineas = []
+    if seguro:
+        lineas.append(f"🏆 Pick del día: <b>{top['selection']}</b> ({top['matchup']}) — {p_top:.0%}, {top.get('conf_nivel','')}.")
+    else:
+        lineas.append("⚠️ Hoy NO hay pick con ≥70% de probabilidad: jornada para pasar o apostar mínimo.")
+    lineas.append(f"Se analizaron {len(bets)} juegos; con nivel «Seguro» o mejor: {seguros_n}.")
+    lineas.append(f"Más seguro disponible: {top['selection']} ({p_top:.0%}).")
+    lineas.append(f"Juego más parejo: {parejo['matchup']} (favorito {g(parejo,'p_ml'):.0%}).")
+    if mejor_p:
+        lineas.append(f"Pitcher del día: {mejor_p[1]} (xERA {mejor_p[0]:.2f}).")
+    if hot and cold:
+        lineas.append(f"Equipo más caliente: {hot[0]} ({hot[1]:.0%}); más frío: {cold[0]} ({cold[1]:.0%}).")
+    else:
+        lineas.append("Fuerza de equipo: sin standings hoy (modo neutral).")
+    lineas.append("Nota: en MLB un solo juego es alta varianza; «seguro» = 70%+, no 90%+.")
+    page_section("Resumen ejecutivo", "Para apostadores conservadores")
+    st.markdown('<div class="rd-exec">' + "".join(f"<p>• {l}</p>" for l in lineas[:10]) + '</div>',
+                unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
 def _sin_jornada():
@@ -2241,6 +2426,7 @@ def _sin_jornada():
 
 ROUTES = {
     "Dashboard": render_dashboard,
+    "Radar Seguro": render_radar,
     "En vivo": render_en_vivo,
     "Resultados": render_resultados,
     "Rendimiento": render_rendimiento,

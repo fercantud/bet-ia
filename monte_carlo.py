@@ -27,6 +27,11 @@ class MonteCarloEngine:
         home_wins = np.sum(home_runs > away_runs)
         prob_home = float(home_wins / self.num_sims)
 
+        # Run Line (-1.5): probabilidad de ganar por 2 o mas carreras, por lado.
+        diff = home_runs - away_runs
+        p_home_rl = float(np.mean(diff >= 2))    # local -1.5
+        p_away_rl = float(np.mean(diff <= -2))   # visitante -1.5
+
         # 4. IC95% empírico vía Percentiles de Bootstrap
         # Generar sub-muestras para calcular la dispersión real del modelo
         sample_probs = [np.mean(home_runs[i:i+500] > away_runs[i:i+500]) for i in range(0, self.num_sims, 500)]
@@ -35,6 +40,8 @@ class MonteCarloEngine:
 
         return {
             "p_home": round(prob_home, 4),
+            "p_home_rl": round(p_home_rl, 4),
+            "p_away_rl": round(p_away_rl, 4),
             "ci_95": (round(ci_lower, 4), round(ci_upper, 4)),
             "exp_runs_home": round(float(np.mean(home_runs)), 2),
             "exp_runs_away": round(float(np.mean(away_runs)), 2)
