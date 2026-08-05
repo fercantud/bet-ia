@@ -1523,6 +1523,7 @@ def build_matchday_rows(games, bets):
 PAGES = [
     ("space_dashboard", "grid", "Dashboard"),
     ("target", "target", "Radar Seguro"),
+    ("sports_tennis", "target", "Tenis"),
     ("sensors", "sensors", "En vivo"),
     ("receipt_long", "receipt", "Resultados"),
     ("leaderboard", "trophy", "Rendimiento"),
@@ -2435,6 +2436,79 @@ def render_radar():
 
 
 # ---------------------------------------------------------------------------
+# PÁGINA: Tenis — Radar de Seguridad (MVP; probabilidad de-vig del mercado)
+# ---------------------------------------------------------------------------
+@st.cache_data(ttl=600)
+def _tennis_picks_cached():
+    from tennis import get_tennis_picks
+    return get_tennis_picks()
+
+
+def _tono_tenis(p):
+    if p >= 0.82:
+        return "save"
+    if p >= 0.72:
+        return "accent"
+    if p >= 0.64:
+        return "warn"
+    return "neutral"
+
+
+def render_tenis():
+    from tennis import SAFE_THRESHOLD_TENNIS
+    page_section("Tenis · Radar de Seguridad",
+                 "El pick MÁS SEGURO del día · ATP/WTA · por probabilidad real (no momio)")
+    picks = _tennis_picks_cached()
+    if not picks:
+        st.info("No hay partidos de tenis disponibles ahora mismo.")
+        return
+    st.markdown(_RADAR_CSS, unsafe_allow_html=True)
+    if not any(b.get("odds_real") for b in picks):
+        st.caption("⚠️ Mostrando partidos de DEMOSTRACIÓN (sin cuotas reales de tenis ahora "
+                   "mismo). Con torneos activos y tu key de The Odds API, salen partidos reales.")
+
+    top = picks[0]
+    seguro = top["safety"] >= SAFE_THRESHOLD_TENNIS
+    if seguro:
+        st.markdown(
+            '<div class="rd-hero"><div class="rd-hero-tag">🏆 PICK MÁS SEGURO DEL DÍA</div>'
+            f'<div class="rd-hero-sel">{top["selection"]}</div>'
+            f'<div class="rd-hero-match">vs {top["rival"]} · {top["tournament"]} · {top["surface"]}</div>'
+            '<div class="rd-hero-grid">'
+            f'<div><p>Probabilidad</p><b>{top["safety"]:.1%}</b></div>'
+            f'<div><p>Confianza</p><b>{top["tag"]}</b></div>'
+            f'<div><p>Momio</p><b>{momio_americano(top["odds"])}</b></div>'
+            f'<div><p>Stake</p><b>{top["stake"]}</b></div>'
+            '</div></div>', unsafe_allow_html=True)
+    else:
+        st.markdown(
+            '<div class="rd-hero rd-hero-off"><div class="rd-hero-tag">⚠️ NO EXISTE UN PICK SEGURO PARA HOY</div>'
+            f'<div class="rd-hero-match" style="margin-top:6px;">Ningún partido supera el '
+            f'{SAFE_THRESHOLD_TENNIS:.0%} de probabilidad. El más seguro: <b>{top["selection"]}</b> '
+            f'({top["safety"]:.1%}, {top["tag"]}).</div></div>', unsafe_allow_html=True)
+
+    filas = ""
+    for b in picks:
+        filas += (
+            f'<tr><td class="num">{b["rank"]}</td><td>{b["tournament"]}</td>'
+            f'<td class="rt-sel">{b["selection"]}</td><td>{b["rival"]}</td><td>{b["surface"]}</td>'
+            f'<td class="num">{momio_americano(b["odds"])}</td><td class="num">{b["safety"]:.1%}</td>'
+            f'<td>{badge(b["conf_nivel"], _tono_tenis(b["safety"]))}</td></tr>')
+    st.markdown(
+        '<div class="rt-wrap"><table class="rt-table"><thead><tr>'
+        '<th class="num">#</th><th>Torneo</th><th>Favorito</th><th>Rival</th><th>Superficie</th>'
+        '<th class="num">Momio</th><th class="num">Prob.</th><th>Confianza</th>'
+        '</tr></thead><tbody>' + filas + '</tbody></table></div>', unsafe_allow_html=True)
+
+    items = "".join(f'<li><b>{b["safety"]:.1%}</b> {b["selection"]} · {b["tournament"]} ({b["surface"]})</li>'
+                    for b in picks[:5])
+    st.markdown(f'<div class="rd-top" style="margin-top:14px;"><h4>🛡️ Top 5 Más Seguros</h4>'
+                f'<ol>{items}</ol></div>', unsafe_allow_html=True)
+    st.caption("MVP: la probabilidad sale del mercado de-vig (el estimador más fino sin API de "
+               "stats). Siguiente nivel: Elo por superficie como señal propia para detectar valor.")
+
+
+# ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
 def _sin_jornada():
@@ -2445,14 +2519,15 @@ def _sin_jornada():
 ROUTES = {
     "Dashboard": render_dashboard,
     "Radar Seguro": render_radar,
+    "Tenis": render_tenis,
     "En vivo": render_en_vivo,
     "Resultados": render_resultados,
     "Rendimiento": render_rendimiento,
 }
 
-# Paginas que viven del historial guardado, no de la jornada del dia: deben
-# abrirse aunque la liga no tenga partidos publicados hoy.
-HISTORICAS = {"Resultados", "Rendimiento"}
+# Paginas que NO dependen de la jornada de MLB del dia: deben abrirse aunque la
+# liga no tenga partidos publicados hoy (historial, o el radar de tenis).
+HISTORICAS = {"Resultados", "Rendimiento", "Tenis"}
 
 pagina = st.session_state.page
 if sorted_bets or pagina in HISTORICAS:
