@@ -4,6 +4,7 @@ Regla #1: PROHIBIDO ordenar por momio. El ranking se construye con el análisis
 deportivo (Elo + forma + superficie + saque + devolución + H2H + fatiga, ver
 tennis_model). El momio se usa SOLO al final para EV, VALUE y SOBREVALORADO.
 """
+import difflib
 import unicodedata
 import tennis_model
 from tennis_api import get_today_matches
@@ -43,15 +44,39 @@ def _norm(s):
 
 
 def _find_player(db, name):
+    """Resuelve `name` (tal como llega del feed de momios) a la clave real que
+    usa el dataset de historial. Intenta, en orden, exacto -> normalizado ->
+    apellido unico -> apellido + inicial de nombre -> el mas jugado entre los
+    que comparten apellido -> similitud difusa del nombre completo. Devuelve
+    None solo si de verdad no hay ningun candidato razonable (jugador sin
+    historial en el dataset, p.ej. debut o qualy)."""
     if name in db.log:
         return name
     nn = _norm(name)
+    if not nn:
+        return None
     for k in db.log:
         if _norm(k) == nn:
             return k
-    ln = nn.split()[-1] if nn else ""
+    partes = nn.split()
+    ln = partes[-1] if partes else ""
+    fi = partes[0][0] if partes else ""
     cands = [k for k in db.log if _norm(k).split()[-1:] == [ln]] if ln else []
-    return cands[0] if len(cands) == 1 else None
+    if len(cands) == 1:
+        return cands[0]
+    if len(cands) > 1:
+        mismo_inicial = [k for k in cands if _norm(k).split()[:1] == [fi] or
+                          (_norm(k).split() and _norm(k).split()[0][:1] == fi)]
+        pool = mismo_inicial or cands
+        # desempate: el jugador con mas historial es el mas probable (tour actual)
+        return max(pool, key=lambda k: len(db.log[k]))
+    cercanos = difflib.get_close_matches(nn, [_norm(k) for k in db.log], n=1, cutoff=0.84)
+    if cercanos:
+        objetivo = cercanos[0]
+        for k in db.log:
+            if _norm(k) == objetivo:
+                return k
+    return None
 
 
 def _devig_home(ho, ao):
@@ -75,26 +100,29 @@ def _pick(m):
     ho, ao = float(m["home_odds"]), float(m["away_odds"])
     pa = _find_player(db, m["home"])
     pb = _find_player(db, m["away"])
+    # Si no se resuelve el nombre, se usa tal cual llego del feed: PlayerDB
+    # trata a un nombre sin historial como jugador promedio del circuito
+    # (Elo 1500, forma/superficie/saque/devolucion neutrales) en vez de
+    # abortar el analisis. analizar() ya atenua la confianza cuando falta
+    # historial de alguno de los dos (ver tennis_model.analizar).
+    home_pl, away_pl = pa or m["home"], pb or m["away"]
 
-    if pa and pb:
-        rh = tennis_model.analizar(db, pa, pb, surface)   # prob de HOME
-        if rh["prob"] >= 0.5:
-            fav_side, fav, riv, odds = "home", m["home"], m["away"], ho
-            prob, fac = rh["prob"], rh["factores"]
-            fav_pl, riv_pl = pa, pb
-        else:
-            ra = tennis_model.analizar(db, pb, pa, surface)
-            fav_side, fav, riv, odds = "away", m["away"], m["home"], ao
-            prob, fac = ra["prob"], ra["factores"]
-            fav_pl, riv_pl = pb, pa
-        fatiga = round(db.fatiga(fav_pl), 2)
-        _, n_h2h = db.h2h_rate(fav_pl, riv_pl)
-        sin_datos = False
-        datos_reales = rh["datos_reales"]
+    rh = tennis_model.analizar(db, home_pl, away_pl, surface)   # prob de HOME
+    if rh["prob"] >= 0.5:
+        fav_side, fav, riv, odds = "home", m["home"], m["away"], ho
+        prob, fac, cobertura = rh["prob"], rh["factores"], rh["cobertura"]
+        fav_pl, riv_pl = home_pl, away_pl
     else:
-        # sin historial de alguno: no se puede analizar de forma honesta
-        fav_side, fav, riv, odds, prob, fac = "home", m["home"], m["away"], ho, 0.50, {}
-        fatiga, n_h2h, sin_datos, datos_reales = 0.0, 0, True, False
+        ra = tennis_model.analizar(db, away_pl, home_pl, surface)
+        fav_side, fav, riv, odds = "away", m["away"], m["home"], ao
+        prob, fac, cobertura = ra["prob"], ra["factores"], ra["cobertura"]
+        fav_pl, riv_pl = away_pl, home_pl
+    fatiga = round(db.fatiga(fav_pl), 2)
+    _, n_h2h = db.h2h_rate(fav_pl, riv_pl)
+    datos_reales = rh["datos_reales"]
+    # "Sin datos" real solo cuando NINGUNO de los dos jugadores tiene
+    # historial (no hay ninguna senal deportiva, ni siquiera parcial).
+    sin_datos = cobertura == "sin_datos"
 
     # --- El momio SOLO aquí: EV, VALUE y SOBREVALORADO ---
     p_home_mkt = _devig_home(ho, ao)
@@ -127,6 +155,7 @@ def _pick(m):
         "fatiga": fatiga, "h2h_n": n_h2h,
         "lesiones": "N/D",                 # sin fuente libre (manual)
         "sin_datos": sin_datos,
+        "cobertura": cobertura,            # completa | parcial | sin_datos
         "datos_reales": datos_reales,
     }
 

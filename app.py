@@ -2502,26 +2502,39 @@ def render_tenis():
         return "Baja" if v < 0.15 else ("Media" if v < 0.40 else "Alta")
 
     tono_valor = {"VALUE": "save", "SOBREVALORADO": "warn", "JUSTO": "neutral", "SIN DATOS": "neutral"}
-    filas = ""
-    for b in picks:
-        filas += (
-            f'<tr><td class="num">{b["rank"]}</td>'
-            f'<td class="rt-sel">{b["selection"]}</td><td>{b["rival"]}</td>'
-            f'<td>{sup_es.get(b["surface"], b["surface"])}</td>'
-            f'<td class="num">{b["prob_ia"]:.1%}</td><td class="num">{b["prob_mkt"]:.1%}</td>'
-            f'<td class="num">{b["ev"]:+.1%}</td>'
-            f'<td class="num">{f10(b["forma"])}</td><td class="num">{f10(b["hard"])}</td>'
-            f'<td class="num">{f10(b["h2h"])}</td><td class="num">{f10(b["elo_hard"])}</td>'
-            f'<td>{fat_lbl(b["fatiga"])}</td><td>{b["lesiones"]}</td>'
-            f'<td>{badge(b["valor"].title(), tono_valor.get(b["valor"], "neutral"))}</td>'
-            f'<td>{badge(b["conf_nivel"], _tono_tenis(b["safety"]))}</td></tr>')
-    st.markdown(
-        '<div class="rt-wrap"><table class="rt-table"><thead><tr>'
-        '<th class="num">#</th><th>Jugador</th><th>Rival</th><th>Sup.</th>'
-        '<th class="num">Prob IA</th><th class="num">Prob Mom</th><th class="num">EV</th>'
-        '<th class="num">Forma</th><th class="num">Hard</th><th class="num">H2H</th>'
-        '<th class="num">Elo H</th><th>Fatiga</th><th>Lesión</th><th>Valor</th><th>Confianza</th>'
-        '</tr></thead><tbody>' + filas + '</tbody></table></div>', unsafe_allow_html=True)
+
+    def _tabla_tenis(sublist, titulo):
+        st.markdown(f'<h4 style="margin:18px 0 8px;">{titulo}</h4>', unsafe_allow_html=True)
+        if not sublist:
+            st.caption(f"Sin partidos de {titulo} disponibles ahora mismo.")
+            return
+        filas = ""
+        for i, b in enumerate(sublist, 1):
+            filas += (
+                f'<tr><td class="num">{i}</td>'
+                f'<td class="rt-sel">{b["selection"]}</td><td>{b["rival"]}</td>'
+                f'<td>{sup_es.get(b["surface"], b["surface"])}</td>'
+                f'<td class="num">{"≈" if b.get("cobertura") == "parcial" else ""}{b["prob_ia"]:.1%}</td>'
+                f'<td class="num">{b["prob_mkt"]:.1%}</td>'
+                f'<td class="num">{b["ev"]:+.1%}</td>'
+                f'<td class="num">{f10(b["forma"])}</td><td class="num">{f10(b["hard"])}</td>'
+                f'<td class="num">{f10(b["h2h"])}</td><td class="num">{f10(b["elo_hard"])}</td>'
+                f'<td>{fat_lbl(b["fatiga"])}</td><td>{b["lesiones"]}</td>'
+                f'<td>{badge(b["valor"].title(), tono_valor.get(b["valor"], "neutral"))}</td>'
+                f'<td>{badge(b["conf_nivel"], _tono_tenis(b["safety"]))}</td></tr>')
+        st.markdown(
+            '<div class="rt-wrap"><table class="rt-table"><thead><tr>'
+            '<th class="num">#</th><th>Jugador</th><th>Rival</th><th>Sup.</th>'
+            '<th class="num">Prob IA</th><th class="num">Prob Mom</th><th class="num">EV</th>'
+            '<th class="num">Forma</th><th class="num">Hard</th><th class="num">H2H</th>'
+            '<th class="num">Elo H</th><th>Fatiga</th><th>Lesión</th><th>Valor</th><th>Confianza</th>'
+            '</tr></thead><tbody>' + filas + '</tbody></table></div>', unsafe_allow_html=True)
+
+    # Cada tabla ordenada de mayor a menor probabilidad IA, por separado.
+    atp_picks = sorted((b for b in picks if b["tour"] == "ATP"), key=lambda b: b["safety"], reverse=True)
+    wta_picks = sorted((b for b in picks if b["tour"] == "WTA"), key=lambda b: b["safety"], reverse=True)
+    _tabla_tenis(atp_picks, "🎾 ATP")
+    _tabla_tenis(wta_picks, "🎾 WTA")
 
     items = "".join(
         f'<li><b>{b["prob_ia"]:.1%}</b> {b["selection"]} · {b["tournament"]} ({b["surface"]}) · {b["conf_nivel"]}</li>'
@@ -2529,7 +2542,8 @@ def render_tenis():
     st.markdown(f'<div class="rd-top" style="margin-top:14px;"><h4>🛡️ Top 5 Más Seguros (por análisis)</h4>'
                 f'<ol>{items}</ol></div>', unsafe_allow_html=True)
     st.caption("Prob. IA = análisis (Elo general y por superficie, forma ponderada por rival, "
-               "superficie, saque, devolución, H2H, fatiga). El momio SOLO se usa para EV, 🔥 VALUE "
+               "superficie, saque, devolución, H2H, fatiga). Si a un jugador le falta historial, se "
+               "estima por su ranking (fila marcada con «≈»). El momio SOLO se usa para EV, 🔥 VALUE "
                "y ⚠️ sobrevalorado. El ranking se construye con la probabilidad del análisis, nunca el momio.")
 
 

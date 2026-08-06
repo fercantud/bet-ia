@@ -1,13 +1,16 @@
 """Capa de datos de tenis: historial de partidos por jugador.
 
-Fuente real (produccion): datasets abiertos de Jeff Sackmann (ATP/WTA) en GitHub,
-partido a partido con superficie y estadisticas de saque/devolucion. Se descargan
-por temporada y se cachean en disco.
+Fuente real (produccion): datasets abiertos estilo Jeff Sackmann (ATP/WTA),
+partido a partido con superficie y estadisticas de saque/devolucion. Se
+descargan por temporada y se cachean en memoria.
 
-En este sandbox el repo de Sackmann responde 404 (red curada), asi que si la
-descarga falla se usa un set SINTETICO pequeno: sirve para verificar toda la
-logica (Elo, forma, factores) end-to-end. En tu Streamlit Cloud la descarga real
-funciona y el motor usa datos verdaderos.
+El repo original github.com/JeffSackmann/tennis_atp (y tennis_wta) dejo de
+existir en esa cuenta (404 real, confirmado tambien via la API de GitHub: el
+usuario ya no lo lista) asi que se prueban, en orden, varias fuentes con
+EXACTAMENTE el mismo esquema de columnas; se usa la primera que responda. Si
+ninguna responde (sin red) se usa un set SINTETICO pequeno: sirve para
+verificar toda la logica (Elo, forma, factores) end-to-end, aunque con muy
+pocos jugadores conocidos.
 
 Cada partido se normaliza a:
   {date:'YYYYMMDD', surface:'Hard|Clay|Grass', winner, loser,
@@ -20,19 +23,36 @@ import time
 import requests
 
 _CACHE = {}          # cache en memoria por (tour, anios)
-_RAW = "https://raw.githubusercontent.com/JeffSackmann/tennis_{tour}/master/{tour}_matches_{year}.csv"
+_HEADERS = {"User-Agent": "Mozilla/5.0 (bet-ia tennis data fetcher)"}
+
+# Fuentes por tour, en orden de intento. La primera es el repo historico de
+# Sackmann (se deja primero por si algun dia vuelve a existir); la segunda es
+# un mirror activo con el mismo esquema de columnas que lo reemplaza hoy.
+_SOURCES = {
+    "atp": [
+        "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_{year}.csv",
+        "https://raw.githubusercontent.com/Aneeshers/tennis-sackmann-archive/main/atp/atp_matches_{year}.csv",
+    ],
+    "wta": [
+        "https://raw.githubusercontent.com/JeffSackmann/tennis_wta/master/wta_matches_{year}.csv",
+        "https://raw.githubusercontent.com/Aneeshers/tennis-sackmann-archive/main/wta/wta_matches_{year}.csv",
+    ],
+}
 
 
 def _fetch_year(tour: str, year: int):
-    url = _RAW.format(tour=tour, year=year)
-    try:
-        r = requests.get(url, timeout=12)
-        if not r.ok or r.text.startswith("404"):
-            return []
-        rows = list(csv.DictReader(io.StringIO(r.text)))
-        return rows
-    except Exception:
-        return []
+    for url_tpl in _SOURCES.get(tour, []):
+        url = url_tpl.format(year=year)
+        try:
+            r = requests.get(url, timeout=12, headers=_HEADERS)
+            if not r.ok or r.text.lstrip().startswith("404"):
+                continue
+            rows = list(csv.DictReader(io.StringIO(r.text)))
+            if rows:
+                return rows
+        except Exception:
+            continue
+    return []
 
 
 _COLS = ("svpt", "1stIn", "1stWon", "2ndWon", "ace", "df", "bpSaved", "bpFaced", "SvGms")
@@ -80,6 +100,61 @@ def get_matches(tour: str = "atp", years=None):
 
 def hay_datos_reales(tour: str = "atp") -> bool:
     return bool(_fetch_year(tour, __import__("datetime").datetime.now().year - 1))
+
+
+def _nkey(nombre: str) -> str:
+    import unicodedata
+    return unicodedata.normalize("NFKD", nombre or "").encode("ascii", "ignore").decode().lower().strip()
+
+
+# Bases de los mirrors que exponen players.csv y rankings_current.csv.
+_ROSTER = [
+    "https://raw.githubusercontent.com/Aneeshers/tennis-sackmann-archive/main/{tour}",
+    "https://raw.githubusercontent.com/JeffSackmann/tennis_{tour}/master",
+]
+
+
+def get_rankings(tour: str = "atp") -> dict:
+    """Ranking actual por jugador: {nombre_normalizado: rank}. Sirve de respaldo
+    para estimar la fuerza de un jugador sin historial de partidos. Cacheado; {}
+    si no hay red (entonces el motor usa solo el historial)."""
+    key = ("rank", tour)
+    if key in _CACHE:
+        return _CACHE[key]
+    out = {}
+    for base_tpl in _ROSTER:
+        base = base_tpl.format(tour=tour)
+        try:
+            pr = requests.get(f"{base}/{tour}_players.csv", timeout=15, headers=_HEADERS)
+            rr = requests.get(f"{base}/{tour}_rankings_current.csv", timeout=20, headers=_HEADERS)
+            if not (pr.ok and rr.ok):
+                continue
+            id2name = {}
+            for row in csv.DictReader(io.StringIO(pr.text)):
+                pid = row.get("player_id")
+                nm = f"{row.get('name_first', '')} {row.get('name_last', '')}".strip()
+                if pid and nm:
+                    id2name[pid] = nm
+            best = {}                      # player_id -> (ranking_date, rank)
+            for row in csv.DictReader(io.StringIO(rr.text)):
+                pid = row.get("player")
+                try:
+                    rank = int(row.get("rank") or 0)
+                except Exception:
+                    continue
+                dt = row.get("ranking_date") or ""
+                if pid and rank and (pid not in best or dt > best[pid][0]):
+                    best[pid] = (dt, rank)
+            for pid, (_dt, rank) in best.items():
+                nm = id2name.get(pid)
+                if nm:
+                    out[_nkey(nm)] = rank
+            if out:
+                break
+        except Exception:
+            continue
+    _CACHE[key] = out
+    return out
 
 
 # ---------------------------------------------------------------------------

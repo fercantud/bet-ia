@@ -14,6 +14,7 @@ momio se usa SOLO al final para EV, VALUE y SOBREVALORADO. Lesiones no tienen
 fuente libre: quedan neutrales (marcado en la salida).
 """
 import math
+import unicodedata
 from collections import defaultdict
 import tennis_data
 
@@ -34,12 +35,14 @@ class PlayerDB:
         self.elo_surf = defaultdict(lambda: defaultdict(lambda: 1500.0))
         self.log = defaultdict(list)                 # jugador -> partidos (cronologico)
         self.h2h = defaultdict(lambda: defaultdict(int))  # h2h[a][b] = veces que A vencio a B
+        self.rank = {}                               # nombre_normalizado -> ranking actual
         self.real = False
         self._build()
 
     def _build(self):
         matches = tennis_data.get_matches(self.tour)
         self.real = tennis_data.hay_datos_reales(self.tour)
+        self.rank = tennis_data.get_rankings(self.tour)
         for m in matches:
             w, l, s, dt = m["winner"], m["loser"], m["surface"], m["date"]
             ew, el = self.elo[w], self.elo[l]
@@ -65,7 +68,37 @@ class PlayerDB:
             rec(l, w, ew, False, mine_l, mine_w)
             self.h2h[w][l] += 1
 
-    # ---- agregados por jugador ----
+    # ---- estimacion de fuerza (respaldo por ranking/Elo si falta historial) ----
+    def _nrm(self, p):
+        return unicodedata.normalize("NFKD", p or "").encode("ascii", "ignore").decode().lower().strip()
+
+    @staticmethod
+    def elo_from_rank(rank):
+        # ranking -> Elo aprox. rank1~2130, 10~1880, 50~1705, 100~1630, 300~1510.
+        if not rank or rank < 1:
+            return 1500.0
+        return max(1300.0, min(2150.0, 2130.0 - 250.0 * math.log10(rank)))
+
+    def eff_elo(self, p, surface=None):
+        """Elo efectivo: historial si existe; si no, ranking; si no, 1500 (promedio)."""
+        if self.log.get(p):
+            if surface:
+                return 0.6 * self.elo_surf[p][surface] + 0.4 * self.elo[p]
+            return self.elo[p]
+        r = self.rank.get(self._nrm(p))
+        return self.elo_from_rank(r) if r else 1500.0
+
+    def _implied(self, p):
+        """Calidad implicita 0-1 desde el Elo efectivo (0.5 = promedio del circuito)."""
+        return _elo_exp(self.eff_elo(p), 1500.0)
+
+    def nivel_dato(self, p):
+        """2 = historial de partidos; 1 = solo ranking; 0 = nada."""
+        if self.log.get(p):
+            return 2
+        return 1 if self.rank.get(self._nrm(p)) else 0
+
+    # ---- agregados por jugador (real con historial; estimado si no lo hay) ----
     def _recent(self, p, surface=None, n=15):
         log = self.log.get(p, [])
         if surface:
@@ -75,23 +108,31 @@ class PlayerDB:
     def forma(self, p):
         r = self._recent(p, n=15)
         if not r:
-            return 0.5
-        # win rate ponderado por calidad del rival (elo del rival / 1500)
+            return self._implied(p)                    # sin historial: estimado
         num = sum((1.0 if x["won"] else 0.0) * (x["opp_elo"] / 1500.0) for x in r)
         den = sum(x["opp_elo"] / 1500.0 for x in r)
-        return num / den if den else 0.5
+        return num / den if den else self._implied(p)
 
     def surf_win(self, p, surface):
         r = self._recent(p, surface=surface, n=20)
-        return (sum(1 for x in r if x["won"]) / len(r)) if r else 0.5
+        if r:
+            return sum(1 for x in r if x["won"]) / len(r)
+        gen = self._recent(p, n=20)                    # sin partidos en esa superficie
+        if gen:
+            return sum(1 for x in gen if x["won"]) / len(gen)
+        return self._implied(p)
 
     def serve(self, p):
         r = self._recent(p, n=15)
-        return (sum(x["serve"] for x in r) / len(r)) if r else 0.62
+        if r:
+            return sum(x["serve"] for x in r) / len(r)
+        return 0.60 + 0.12 * (2 * self._implied(p) - 1)    # estimado desde la calidad
 
     def ret(self, p):
         r = self._recent(p, n=15)
-        return (sum(x["ret"] for x in r) / len(r)) if r else 0.20
+        if r:
+            return sum(x["ret"] for x in r) / len(r)
+        return 0.19 + 0.10 * (2 * self._implied(p) - 1)    # estimado desde la calidad
 
     def fatiga(self, p):
         """Penalizacion 0..1 (mas alto = mas cansado)."""
@@ -120,10 +161,24 @@ def _dias(d1, d2):
 
 
 def analizar(db: PlayerDB, a: str, b: str, surface: str) -> dict:
-    """Devuelve prob de que A venza a B + el desglose de factores (0-100 para A)."""
+    """Devuelve prob de que A venza a B + el desglose de factores (0-100 para A).
+
+    Los agregados (forma/surf_win/serve/ret/fatiga) ya son "auto-fallback": si
+    un jugador no tiene historial (nombre no resuelto en el dataset) los
+    defaultdicts de PlayerDB lo tratan como un jugador promedio del circuito
+    (Elo 1500, 50% forma, etc.) en lugar de romper el calculo. Asi que esta
+    funcion SIEMPRE produce un desglose numerico completo, nunca None/"—".
+
+    Cuando a uno de los dos (o ambos) no se le conoce historial real, la
+    desviacion del composite respecto al 50 se atenua con `confianza` para no
+    sobre-afirmar certeza sobre un rival "inventado" por el valor neutral.
+    Con 0 jugadores conocidos no hay senal real: los factores ya salen en 50
+    de forma natural (ambos lados usan el mismo default) y prob=0.50 es la
+    respuesta honesta, no un placeholder.
+    """
     surface = (surface or "Hard").title()
-    p_elo = _elo_exp(0.6 * db.elo_surf[a][surface] + 0.4 * db.elo[a],
-                     0.6 * db.elo_surf[b][surface] + 0.4 * db.elo[b])
+    # Elo EFECTIVO: usa historial si hay; si no, ranking; si no, promedio.
+    p_elo = _elo_exp(db.eff_elo(a, surface), db.eff_elo(b, surface))
 
     f = {}
     f["elo"] = _clip(100.0 * p_elo)
@@ -137,8 +192,21 @@ def analizar(db: PlayerDB, a: str, b: str, surface: str) -> dict:
     f["contexto"] = 50.0                                            # sin datos extra: neutral
 
     composite = sum(WEIGHTS[k] * f[k] for k in WEIGHTS)
-    prob = 1.0 / (1.0 + math.exp(-0.11 * (composite - 50.0)))
+
+    # Confianza segun cuanto dato REAL hay de cada lado (historial > ranking > nada).
+    na, nb = db.nivel_dato(a), db.nivel_dato(b)
+    if na == 0 and nb == 0:
+        confianza, cobertura = 0.0, "sin_datos"
+    elif na == 2 and nb == 2:
+        confianza, cobertura = 1.0, "completa"
+    elif min(na, nb) >= 1:
+        confianza, cobertura = 0.82, "parcial"        # ambos con al menos ranking
+    else:
+        confianza, cobertura = 0.62, "parcial"        # uno conocido, otro sin nada
+    composite_final = 50.0 + (composite - 50.0) * confianza
+
+    prob = 1.0 / (1.0 + math.exp(-0.11 * (composite_final - 50.0)))
     prob = max(0.03, min(0.97, prob))
     return {"prob": round(prob, 4), "composite": round(composite, 1),
             "factores": {k: round(v, 1) for k, v in f.items()},
-            "h2h_n": n_h2h, "datos_reales": db.real}
+            "h2h_n": n_h2h, "datos_reales": db.real, "cobertura": cobertura}
