@@ -1520,10 +1520,16 @@ def build_matchday_rows(games, bets):
 # ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
+# Deportes (nivel superior, barra de arriba estilo Flashscore). Cada deporte tiene
+# su propio sub-menu. Tenis deja de estar "dentro" de beisbol.
+SPORTS = [("beisbol", "⚾", "Béisbol"), ("tenis", "🎾", "Tenis")]
+if "sport" not in st.session_state:
+    st.session_state.sport = "beisbol"
+
+# Sub-paginas de BÉISBOL.
 PAGES = [
     ("space_dashboard", "grid", "Dashboard"),
     ("target", "target", "Radar Seguro"),
-    ("sports_tennis", "target", "Tenis"),
     ("sensors", "sensors", "En vivo"),
     ("receipt_long", "receipt", "Resultados"),
     ("leaderboard", "trophy", "Rendimiento"),
@@ -1541,34 +1547,49 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # --- Selector de liga ---
-    st.markdown('<p class="sb-lbl">Liga</p>', unsafe_allow_html=True)
-    cols = st.columns(len(LIGAS))
-    for col, (clave, cfg) in zip(cols, LIGAS.items()):
-        activa = st.session_state.liga == clave
-        if col.button(cfg["nombre"], key=f"liga_{clave}", use_container_width=True,
-                      type="primary" if activa else "secondary"):
-            st.session_state.liga = clave
-            st.rerun()
-    st.markdown('<div class="sb-sep"></div>', unsafe_allow_html=True)
-    for micon, _, label in PAGES:
-        active = st.session_state.page == label
-        if st.button(f":material/{micon}: {label}", key=f"nav_{label}", use_container_width=True,
-                     type="primary" if active else "secondary"):
-            st.session_state.page = label
-            st.rerun()
-
-    live_now = [x for x in fetch_live_scores() if x["is_live"]]
     now = hora12(now_local(), con_segundos=True)
-    st.markdown(
-        f'<div style="margin-top:16px;padding-top:14px;border-top:1px solid rgb(var(--dkline));">'
-        f'<p style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;'
-        f'color:rgb(var(--dkink2));margin-bottom:8px;">Estado de la jornada</p>'
-        f'<p style="font-size:13.5px;margin:3px 0;">🟢 <b>{len(live_now)}</b> en vivo ahora</p>'
-        f'<p style="font-size:13.5px;margin:3px 0;">🎯 <b>{len(approved_picks)}</b> picks aprobados</p>'
-        f'<p style="font-size:12px;color:rgb(var(--dkink2));margin-top:6px;">Sync: {now}</p></div>',
-        unsafe_allow_html=True,
-    )
+    if st.session_state.sport == "beisbol":
+        # --- Selector de liga ---
+        st.markdown('<p class="sb-lbl">Liga</p>', unsafe_allow_html=True)
+        cols = st.columns(len(LIGAS))
+        for col, (clave, cfg) in zip(cols, LIGAS.items()):
+            activa = st.session_state.liga == clave
+            if col.button(cfg["nombre"], key=f"liga_{clave}", use_container_width=True,
+                          type="primary" if activa else "secondary"):
+                st.session_state.liga = clave
+                st.rerun()
+        st.markdown('<div class="sb-sep"></div>', unsafe_allow_html=True)
+        for micon, _, label in PAGES:
+            active = st.session_state.page == label
+            if st.button(f":material/{micon}: {label}", key=f"nav_{label}", use_container_width=True,
+                         type="primary" if active else "secondary"):
+                st.session_state.page = label
+                st.rerun()
+
+        live_now = [x for x in fetch_live_scores() if x["is_live"]]
+        st.markdown(
+            f'<div style="margin-top:16px;padding-top:14px;border-top:1px solid rgb(var(--dkline));">'
+            f'<p style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;'
+            f'color:rgb(var(--dkink2));margin-bottom:8px;">Estado de la jornada</p>'
+            f'<p style="font-size:13.5px;margin:3px 0;">🟢 <b>{len(live_now)}</b> en vivo ahora</p>'
+            f'<p style="font-size:13.5px;margin:3px 0;">🎯 <b>{len(approved_picks)}</b> picks aprobados</p>'
+            f'<p style="font-size:12px;color:rgb(var(--dkink2));margin-top:6px;">Sync: {now}</p></div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        # --- Tenis: su propio sub-menu ---
+        st.markdown('<p class="sb-lbl">Tenis</p>', unsafe_allow_html=True)
+        st.markdown('<div class="sb-sep"></div>', unsafe_allow_html=True)
+        st.button(":material/sports_tennis: Radar de Seguridad", key="nav_tenis_radar",
+                  use_container_width=True, type="primary")
+        st.markdown(
+            '<div style="margin-top:16px;padding-top:14px;border-top:1px solid rgb(var(--dkline));">'
+            '<p style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;'
+            'color:rgb(var(--dkink2));margin-bottom:8px;">ATP + WTA</p>'
+            '<p style="font-size:12.5px;color:rgb(var(--dkink2));margin:3px 0;">Pick más seguro por '
+            'análisis (Elo, forma, superficie, saque, devolución, H2H).</p></div>',
+            unsafe_allow_html=True,
+        )
     st.markdown(
         f'<div class="fh-sys" style="margin-top:16px;">'
         f'<div class="fh-sys-row"><h4>Sistema</h4>{badge("Operativo", "save")}</div>'
@@ -2559,18 +2580,33 @@ def _sin_jornada():
 ROUTES = {
     "Dashboard": render_dashboard,
     "Radar Seguro": render_radar,
-    "Tenis": render_tenis,
     "En vivo": render_en_vivo,
     "Resultados": render_resultados,
     "Rendimiento": render_rendimiento,
 }
 
-# Paginas que NO dependen de la jornada de MLB del dia: deben abrirse aunque la
-# liga no tenga partidos publicados hoy (historial, o el radar de tenis).
-HISTORICAS = {"Resultados", "Rendimiento", "Tenis"}
+# Paginas de beisbol que NO dependen de la jornada del dia (historial).
+HISTORICAS = {"Resultados", "Rendimiento"}
 
-pagina = st.session_state.page
-if sorted_bets or pagina in HISTORICAS:
-    ROUTES.get(pagina, render_dashboard)()
+# --- Barra de DEPORTES (arriba del contenido, estilo Flashscore) ---
+st.markdown(
+    '<style>.st-key-sport_beisbol button, .st-key-sport_tenis button{'
+    'font-weight:700 !important;font-size:15px !important;border-radius:10px !important;}</style>',
+    unsafe_allow_html=True)
+_sp = st.columns([1.2, 1.2, 6.6])
+for _i, (_sk, _ico, _lbl) in enumerate(SPORTS):
+    _act = st.session_state.sport == _sk
+    if _sp[_i].button(f"{_ico}  {_lbl}", key=f"sport_{_sk}", use_container_width=True,
+                      type="primary" if _act else "secondary"):
+        st.session_state.sport = _sk
+        st.rerun()
+
+# --- Router por DEPORTE ---
+if st.session_state.sport == "tenis":
+    render_tenis()
 else:
-    _sin_jornada()
+    pagina = st.session_state.page
+    if sorted_bets or pagina in HISTORICAS:
+        ROUTES.get(pagina, render_dashboard)()
+    else:
+        _sin_jornada()
