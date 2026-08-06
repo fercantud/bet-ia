@@ -81,8 +81,12 @@ def get_today_matches() -> list:
                         "tournament": sk.replace("tennis_", "").replace("_", " ").title(),
                         "surface": _surface_from_key(sk),
                         "home": home, "away": away,
-                        "home_odds": round(sum(h_odds) / len(h_odds), 2),
-                        "away_odds": round(sum(a_odds) / len(a_odds), 2),
+                        # MEJOR cuota disponible (la mas alta = mejor pago), no el
+                        # promedio: es la que realmente conseguirias al apostar, y
+                        # la correcta para calcular el EV.
+                        "home_odds": round(max(h_odds), 2),
+                        "away_odds": round(max(a_odds), 2),
+                        "books": max(len(h_odds), len(a_odds)),
                         "demo": False,
                     })
         return matches or _demo()
