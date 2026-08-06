@@ -13,16 +13,16 @@ import requests
 
 BASE = "https://api.the-odds-api.com/v4"
 
-# Set de demostracion (fallback). Cuotas realistas de favoritos de distinto nivel.
+# Set de demostracion (fallback). Usa jugadores que el motor conoce (mismos del
+# set sintetico) para que el analisis se vea diferenciado incluso sin red.
+# (tour, torneo, superficie, home, away, home_odds, away_odds)
 DEMO_MATCHES = [
-    ("ATP Masters 1000", "Dura", "Novak Djokovic", "Lorenzo Musetti", 1.14, 5.75),
-    ("ATP Masters 1000", "Dura", "Carlos Alcaraz", "Frances Tiafoe", 1.20, 4.60),
-    ("ATP 500", "Dura", "Jannik Sinner", "Karen Khachanov", 1.28, 3.80),
-    ("ATP 500", "Arcilla", "Alexander Zverev", "Sebastian Baez", 1.45, 2.75),
-    ("ATP 250", "Arcilla", "Casper Ruud", "Ugo Humbert", 1.62, 2.30),
-    ("ATP 250", "Pasto", "Taylor Fritz", "Ben Shelton", 1.90, 1.90),
-    ("Challenger", "Dura", "Tomas Machac", "Jakub Mensik", 2.15, 1.70),
-    ("ATP 250", "Dura", "Daniil Medvedev", "Alexei Popyrin", 1.33, 3.40),
+    ("wta", "WTA Canadian Open", "Hard", "Iga Swiatek", "Viktorija Golubic", 1.06, 8.00),
+    ("wta", "WTA Canadian Open", "Hard", "Aryna Sabalenka", "Shuai Zhang", 1.11, 6.20),
+    ("wta", "WTA Canadian Open", "Hard", "Naomi Osaka", "Iga Swiatek", 4.50, 1.18),
+    ("atp", "ATP Masters 1000", "Hard", "Carlos Alcaraz", "Alexei Popyrin", 1.12, 5.50),
+    ("atp", "ATP Masters 1000", "Hard", "Jannik Sinner", "Sebastian Baez", 1.15, 4.80),
+    ("atp", "ATP 250", "Clay", "Daniil Medvedev", "Sebastian Baez", 1.70, 2.10),
 ]
 
 
@@ -31,18 +31,19 @@ def _api_key():
 
 
 def _demo():
-    return [{"tournament": t, "surface": s, "home": h, "away": a,
+    return [{"tour": to, "tournament": t, "surface": s, "home": h, "away": a,
              "home_odds": ho, "away_odds": ao, "demo": True}
-            for (t, s, h, a, ho, ao) in DEMO_MATCHES]
+            for (to, t, s, h, a, ho, ao) in DEMO_MATCHES]
 
 
 def _surface_from_key(sk: str) -> str:
+    # Ingles (Hard/Clay/Grass) para cuadrar con Sackmann; la UI lo puede traducir.
     s = sk.lower()
     if any(x in s for x in ("french", "roland", "clay", "madrid", "rome", "monte", "hamburg")):
-        return "Arcilla"
+        return "Clay"
     if any(x in s for x in ("wimbledon", "grass", "queens", "halle", "eastbourne")):
-        return "Pasto"
-    return "Dura"
+        return "Grass"
+    return "Hard"
 
 
 def get_today_matches() -> list:
@@ -76,6 +77,7 @@ def get_today_matches() -> list:
                                 a_odds.append(o["price"])
                 if home and away and h_odds and a_odds:
                     matches.append({
+                        "tour": "wta" if "wta" in sk.lower() else "atp",
                         "tournament": sk.replace("tennis_", "").replace("_", " ").title(),
                         "surface": _surface_from_key(sk),
                         "home": home, "away": away,

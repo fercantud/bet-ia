@@ -2445,37 +2445,43 @@ def _tennis_picks_cached():
 
 
 def _tono_tenis(p):
-    if p >= 0.82:
+    if p >= 0.90:
         return "save"
-    if p >= 0.72:
+    if p >= 0.85:
         return "accent"
-    if p >= 0.64:
+    if p >= 0.80:
         return "warn"
-    return "neutral"
+    return "fare"
 
 
 def render_tenis():
     from tennis import SAFE_THRESHOLD_TENNIS
-    page_section("Tenis · Radar de Seguridad",
-                 "El pick MÁS SEGURO del día · ATP/WTA · por probabilidad real (no momio)")
+    page_section("Tenis · Selección de Picks Seguros",
+                 "Ranking por ANÁLISIS deportivo (Elo + forma + superficie…) · el momio SOLO se usa para EV/valor")
     picks = _tennis_picks_cached()
     if not picks:
         st.info("No hay partidos de tenis disponibles ahora mismo.")
         return
     st.markdown(_RADAR_CSS, unsafe_allow_html=True)
-    if not any(b.get("odds_real") for b in picks):
-        st.caption("⚠️ Mostrando partidos de DEMOSTRACIÓN (sin cuotas reales de tenis ahora "
-                   "mismo). Con torneos activos y tu key de The Odds API, salen partidos reales.")
+    if not any(b.get("datos_reales") for b in picks):
+        st.caption("⚠️ DEMO / datos sintéticos: aquí no hay acceso al histórico de Sackmann. En tu "
+                   "Streamlit Cloud el motor usa partidos y estadísticas reales.")
+    st.caption("🩹 Lesiones: sin fuente libre en tiempo real → columna manual (N/D). El resto de "
+               "factores sí sale de datos.")
 
+    sup_es = {"Hard": "Dura", "Clay": "Arcilla", "Grass": "Pasto"}
     top = picks[0]
     seguro = top["safety"] >= SAFE_THRESHOLD_TENNIS
     if seguro:
         st.markdown(
             '<div class="rd-hero"><div class="rd-hero-tag">🏆 PICK MÁS SEGURO DEL DÍA</div>'
             f'<div class="rd-hero-sel">{top["selection"]}</div>'
-            f'<div class="rd-hero-match">vs {top["rival"]} · {top["tournament"]} · {top["surface"]}</div>'
+            f'<div class="rd-hero-match">vs {top["rival"]} · {top["tournament"]} · '
+            f'{sup_es.get(top["surface"], top["surface"])}</div>'
             '<div class="rd-hero-grid">'
-            f'<div><p>Probabilidad</p><b>{top["safety"]:.1%}</b></div>'
+            f'<div><p>Prob. IA</p><b>{top["prob_ia"]:.1%}</b></div>'
+            f'<div><p>Prob. Momio</p><b>{top["prob_mkt"]:.1%}</b></div>'
+            f'<div><p>EV</p><b>{top["ev"]:+.1%}</b></div>'
             f'<div><p>Confianza</p><b>{top["tag"]}</b></div>'
             f'<div><p>Momio</p><b>{momio_americano(top["odds"])}</b></div>'
             f'<div><p>Stake</p><b>{top["stake"]}</b></div>'
@@ -2484,28 +2490,47 @@ def render_tenis():
         st.markdown(
             '<div class="rd-hero rd-hero-off"><div class="rd-hero-tag">⚠️ NO EXISTE UN PICK SEGURO PARA HOY</div>'
             f'<div class="rd-hero-match" style="margin-top:6px;">Ningún partido supera el '
-            f'{SAFE_THRESHOLD_TENNIS:.0%} de probabilidad. El más seguro: <b>{top["selection"]}</b> '
-            f'({top["safety"]:.1%}, {top["tag"]}).</div></div>', unsafe_allow_html=True)
+            f'{SAFE_THRESHOLD_TENNIS:.0%} de probabilidad por análisis. El más seguro: '
+            f'<b>{top["selection"]}</b> ({top["prob_ia"]:.1%}, {top["conf_nivel"]}).</div></div>',
+            unsafe_allow_html=True)
 
+    # Tabla rica: se ve POR QUÉ un pick quedó arriba de otro (factores 0-10).
+    def f10(x):
+        return f"{x/10:.1f}" if x is not None else "—"
+
+    def fat_lbl(v):
+        return "Baja" if v < 0.15 else ("Media" if v < 0.40 else "Alta")
+
+    tono_valor = {"VALUE": "save", "SOBREVALORADO": "warn", "JUSTO": "neutral", "SIN DATOS": "neutral"}
     filas = ""
     for b in picks:
         filas += (
-            f'<tr><td class="num">{b["rank"]}</td><td>{b["tournament"]}</td>'
-            f'<td class="rt-sel">{b["selection"]}</td><td>{b["rival"]}</td><td>{b["surface"]}</td>'
-            f'<td class="num">{momio_americano(b["odds"])}</td><td class="num">{b["safety"]:.1%}</td>'
+            f'<tr><td class="num">{b["rank"]}</td>'
+            f'<td class="rt-sel">{b["selection"]}</td><td>{b["rival"]}</td>'
+            f'<td>{sup_es.get(b["surface"], b["surface"])}</td>'
+            f'<td class="num">{b["prob_ia"]:.1%}</td><td class="num">{b["prob_mkt"]:.1%}</td>'
+            f'<td class="num">{b["ev"]:+.1%}</td>'
+            f'<td class="num">{f10(b["forma"])}</td><td class="num">{f10(b["hard"])}</td>'
+            f'<td class="num">{f10(b["h2h"])}</td><td class="num">{f10(b["elo_hard"])}</td>'
+            f'<td>{fat_lbl(b["fatiga"])}</td><td>{b["lesiones"]}</td>'
+            f'<td>{badge(b["valor"].title(), tono_valor.get(b["valor"], "neutral"))}</td>'
             f'<td>{badge(b["conf_nivel"], _tono_tenis(b["safety"]))}</td></tr>')
     st.markdown(
         '<div class="rt-wrap"><table class="rt-table"><thead><tr>'
-        '<th class="num">#</th><th>Torneo</th><th>Favorito</th><th>Rival</th><th>Superficie</th>'
-        '<th class="num">Momio</th><th class="num">Prob.</th><th>Confianza</th>'
+        '<th class="num">#</th><th>Jugador</th><th>Rival</th><th>Sup.</th>'
+        '<th class="num">Prob IA</th><th class="num">Prob Mom</th><th class="num">EV</th>'
+        '<th class="num">Forma</th><th class="num">Hard</th><th class="num">H2H</th>'
+        '<th class="num">Elo H</th><th>Fatiga</th><th>Lesión</th><th>Valor</th><th>Confianza</th>'
         '</tr></thead><tbody>' + filas + '</tbody></table></div>', unsafe_allow_html=True)
 
-    items = "".join(f'<li><b>{b["safety"]:.1%}</b> {b["selection"]} · {b["tournament"]} ({b["surface"]})</li>'
-                    for b in picks[:5])
-    st.markdown(f'<div class="rd-top" style="margin-top:14px;"><h4>🛡️ Top 5 Más Seguros</h4>'
+    items = "".join(
+        f'<li><b>{b["prob_ia"]:.1%}</b> {b["selection"]} · {b["tournament"]} ({b["surface"]}) · {b["conf_nivel"]}</li>'
+        for b in picks[:5])
+    st.markdown(f'<div class="rd-top" style="margin-top:14px;"><h4>🛡️ Top 5 Más Seguros (por análisis)</h4>'
                 f'<ol>{items}</ol></div>', unsafe_allow_html=True)
-    st.caption("MVP: la probabilidad sale del mercado de-vig (el estimador más fino sin API de "
-               "stats). Siguiente nivel: Elo por superficie como señal propia para detectar valor.")
+    st.caption("Prob. IA = análisis (Elo general y por superficie, forma ponderada por rival, "
+               "superficie, saque, devolución, H2H, fatiga). El momio SOLO se usa para EV, 🔥 VALUE "
+               "y ⚠️ sobrevalorado. El ranking se construye con la probabilidad del análisis, nunca el momio.")
 
 
 # ---------------------------------------------------------------------------
