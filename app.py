@@ -2516,6 +2516,7 @@ def render_tenis():
                 f'<td>{sup_es.get(b["surface"], b["surface"])}</td>'
                 f'<td class="num">{"≈" if b.get("cobertura") == "parcial" else ""}{b["prob_ia"]:.1%}</td>'
                 f'<td class="num">{b["prob_mkt"]:.1%}</td>'
+                f'<td class="num">{b["odds"]:.2f}</td>'
                 f'<td class="num">{b["ev"]:+.1%}</td>'
                 f'<td class="num">{f10(b["forma"])}</td><td class="num">{f10(b["hard"])}</td>'
                 f'<td class="num">{f10(b["h2h"])}</td><td class="num">{f10(b["elo_hard"])}</td>'
@@ -2525,7 +2526,7 @@ def render_tenis():
         st.markdown(
             '<div class="rt-wrap"><table class="rt-table"><thead><tr>'
             '<th class="num">#</th><th>Jugador</th><th>Rival</th><th>Sup.</th>'
-            '<th class="num">Prob IA</th><th class="num">Prob Mom</th><th class="num">EV</th>'
+            '<th class="num">Prob IA</th><th class="num">Prob Mom</th><th class="num">Cuota</th><th class="num">EV</th>'
             '<th class="num">Forma</th><th class="num">Hard</th><th class="num">H2H</th>'
             '<th class="num">Elo H</th><th>Fatiga</th><th>Lesión</th><th>Valor</th><th>Confianza</th>'
             '</tr></thead><tbody>' + filas + '</tbody></table></div>', unsafe_allow_html=True)
